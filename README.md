@@ -247,4 +247,3 @@ V1 跑通并完成准确性评估后，优先探索用户自定义过滤条件�
 - [LinkedIn NoSlop](https://github.com/sushrutb17/linkedin-noslop-extension)：参考其 Chrome Manifest V3 原型、Jev 结构化判断、确定性决策、失败时保持可见和可逆过滤原则。
 
 本项目针对小红书的图片卡片和中文内容场景重新定义数据采集与过滤标准，不直接复制 X 或 LinkedIn 的纯文本内容假设。
-
