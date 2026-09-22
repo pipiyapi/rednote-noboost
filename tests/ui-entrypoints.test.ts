@@ -26,4 +26,21 @@ describe("extension UI entrypoints", () => {
     expect(resolvedScript).toBe(expectedScript);
     await expect(access(resolvedScript)).resolves.toBeUndefined();
   });
+
+  it("popup 提供开始与暂停按钮，设置页不再重复提供自动扫描开关", async () => {
+    const popup = await readFile(path.join(extensionRoot, "src/ui/popup.html"), "utf8");
+    const options = await readFile(path.join(extensionRoot, "src/ui/options.html"), "utf8");
+
+    expect(popup).toContain('id="start-scan"');
+    expect(popup).toContain('id="pause-scan"');
+    expect(options).not.toContain('id="toggle-autoscan"');
+  });
+
+  it("manifest 允许 popup 在缺少接收方时注入内容脚本", async () => {
+    const manifest = JSON.parse(
+      await readFile(path.join(extensionRoot, "manifest.json"), "utf8"),
+    ) as { permissions?: string[] };
+
+    expect(manifest.permissions).toContain("scripting");
+  });
 });

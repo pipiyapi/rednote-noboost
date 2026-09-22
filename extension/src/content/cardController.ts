@@ -34,7 +34,7 @@ export type CardController = {
   getDecision(noteId: string): NoteStatus | undefined;
   /** 开关变化后重放全部已判定卡片（不重新调用 API）。 */
   reapplyAll(switches: FilterSwitches): void;
-  /** 离开首页或暂停时使用：移除全部叠加层，页面恢复原样。 */
+  /** 离开首页时使用：移除全部叠加层，页面恢复原样。 */
   clearAllOverlays(): void;
   forget(noteId: string): void;
 };

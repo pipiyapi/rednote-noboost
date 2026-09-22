@@ -109,17 +109,9 @@
       </label>
     </fieldset>
 
-    <fieldset>
-      <legend>扫描</legend>
-      <label class="row">
-        <input id="toggle-autoscan" type="checkbox" />
-        <span>随滚动自动扫描 <span class="row-desc">（关闭后不再发现新笔记，已显示的内容不受影响）</span></span>
-      </label>
-    </fieldset>
-
     <p class="warn">
-      当前为开发骨架：问题集与阈值尚未标定，判定链路会统一返回「依据不足」，因此不会模糊任何内容。
-      这不是故障，而是 fail open 的默认状态。
+      扫描默认暂停。请回到小红书首页，从插件面板点击“开始扫描”；刷新页面后需要再次手动开始，
+      以避免意外产生 API 调用。
     </p>
 
     <script type="module" src="../../dist/options.js"></script>

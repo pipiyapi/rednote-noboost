@@ -10,7 +10,7 @@ import { extractNoteText } from "./extractor";
 import { createFeedObserver, type DiscoveredNote } from "./feedObserver";
 import { recognizeCoverText } from "./ocr";
 import { isHomeFeed, onRouteChange } from "./routeGate";
-import { createScanQueue, type QueueJob } from "./scanQueue";
+import { createManualScanControl, createScanQueue, type QueueJob } from "./scanQueue";
 
 const CLASSIFY_CONCURRENCY = 3;
 
@@ -31,12 +31,20 @@ function emptyStats(): ScanStats {
 let stats: ScanStats = emptyStats();
 // 默认值待评估确认：建议 V1 先只开商业推广过滤器（情绪类误判代价最高）。
 let switches: FilterSwitches = { commercial: true, emotional: false };
-let autoScanEnabled = true;
 let running = false;
 
 const controller = createCardController();
 const observer = createFeedObserver(onDiscover);
 const queue = createScanQueue({ process: processNote, concurrency: CLASSIFY_CONCURRENCY });
+const scanControl = createManualScanControl({
+  setPaused: (paused) => queue.setPaused(paused),
+  clearPending: () => queue.clear(),
+  restartDiscovery: () => {
+    if (!running) return;
+    observer.stop();
+    observer.start();
+  },
+});
 
 // ---------------------------------------------------------------- 生命周期
 
@@ -44,7 +52,6 @@ function activate(): void {
   if (running) return;
   running = true;
   observer.start();
-  queue.setPaused(!autoScanEnabled);
 }
 
 function deactivate(reason: string): void {
@@ -52,6 +59,7 @@ function deactivate(reason: string): void {
   running = false;
   // 离开首页：停止扫描、清空待办、移除全部叠加层，页面恢复原样（基线 4.1）。
   observer.stop();
+  scanControl.pause();
   queue.setPaused(true);
   queue.clear();
   controller.clearAllOverlays();
@@ -65,7 +73,7 @@ function onDiscover(note: DiscoveredNote): void {
   if (controller.attach(note.noteId, note.element, switches)) return;
 
   controller.markUndetermined(note.noteId, note.element);
-  if (!autoScanEnabled) return;
+  if (!scanControl.enabled) return;
 
   stats.discovered += 1;
   queue.enqueue({ noteId: note.noteId, element: note.element });
@@ -164,24 +172,18 @@ function sendToWorker(message: ContentToWorker): Promise<WorkerToContent | null>
 
 function readSettings(): void {
   chrome.storage.local.get(
-    ["autoScanEnabled", "filterCommercial", "filterEmotional"],
+    ["filterCommercial", "filterEmotional"],
     (res: Record<string, unknown>) => {
-      autoScanEnabled = res["autoScanEnabled"] !== false;
       switches = {
         commercial: res["filterCommercial"] !== false,
         emotional: res["filterEmotional"] === true,
       };
-      queue.setPaused(!autoScanEnabled);
       if (running) controller.reapplyAll(switches);
     },
   );
 }
 
 chrome.storage.onChanged.addListener((changes: Record<string, chrome.storage.StorageChange>) => {
-  if (changes["autoScanEnabled"]) {
-    autoScanEnabled = changes["autoScanEnabled"].newValue !== false;
-    queue.setPaused(!autoScanEnabled);
-  }
   if (changes["filterCommercial"] || changes["filterEmotional"]) {
     switches = {
       commercial: changes["filterCommercial"]?.newValue !== false,
@@ -193,11 +195,24 @@ chrome.storage.onChanged.addListener((changes: Record<string, chrome.storage.Sto
 });
 
 chrome.runtime.onMessage.addListener((message: UiToContent, _sender, sendResponse) => {
-  if (message?.type !== "GET_SCAN_STATS") return false;
+  if (!message) return false;
+
+  if (message.type === "START_SCAN") {
+    if (!running) {
+      sendResponse({ type: "SCAN_STATS_UNAVAILABLE", reason: "not_home_feed" });
+      return false;
+    }
+    scanControl.start();
+  } else if (message.type === "PAUSE_SCAN") {
+    scanControl.pause();
+  } else if (message.type !== "GET_SCAN_STATS") {
+    return false;
+  }
+
   sendResponse({
     type: "SCAN_STATS",
     stats: { ...stats },
-    state: running ? (autoScanEnabled ? "scanning" : "paused") : "ready",
+    state: running ? (scanControl.enabled ? "scanning" : "paused") : "ready",
   });
   return false;
 });

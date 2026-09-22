@@ -22,6 +22,41 @@ export type ScanQueue = {
   readonly inFlightCount: number;
 };
 
+export type ManualScanControl = {
+  readonly enabled: boolean;
+  start(): void;
+  pause(): void;
+};
+
+/** 页面级手动开关：每次 content script 启动都从暂停开始，不持久化到 storage。 */
+export function createManualScanControl(actions: {
+  setPaused(paused: boolean): void;
+  restartDiscovery(): void;
+  clearPending(): void;
+}): ManualScanControl {
+  let enabled = false;
+  actions.setPaused(true);
+
+  return {
+    get enabled(): boolean {
+      return enabled;
+    },
+    start(): void {
+      if (enabled) return;
+      enabled = true;
+      // 先重新发现当前卡片并排入暂停中的队列，再统一放行，避免漏掉首屏。
+      actions.restartDiscovery();
+      actions.setPaused(false);
+    },
+    pause(): void {
+      if (!enabled) return;
+      enabled = false;
+      actions.setPaused(true);
+      actions.clearPending();
+    },
+  };
+}
+
 export function createScanQueue(options: {
   process: (job: QueueJob) => Promise<void>;
   concurrency?: number;

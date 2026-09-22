@@ -7,7 +7,7 @@
 // 注意：worker 里返回 true 表示「稍后异步 sendResponse」，这是 MV3 的硬要求，
 // 忘记 return true 会导致响应永远收不到。
 
-import type { DecisionStatus, FailureKind, InputSource, ScanStats } from "./types";
+import type { DecisionStatus, FailureKind, InputSource, ScanState, ScanStats } from "./types";
 
 export type ContentToWorker =
   | { type: "PING" }
@@ -30,9 +30,12 @@ export type WorkerToContent =
   | { type: "COVER_BYTES"; ok: true; noteId: string; base64: string; mimeType: string }
   | { type: "COVER_BYTES"; ok: false; noteId: string; kind: FailureKind };
 
-/** popup 向 content script 索取当前页面的扫描统计。 */
-export type UiToContent = { type: "GET_SCAN_STATS" };
+/** popup 查询或控制当前页面的扫描会话。开始/暂停状态不跨页面刷新持久化。 */
+export type UiToContent =
+  | { type: "GET_SCAN_STATS" }
+  | { type: "START_SCAN" }
+  | { type: "PAUSE_SCAN" };
 
 export type ContentToUi =
-  | { type: "SCAN_STATS"; stats: ScanStats; state: string }
+  | { type: "SCAN_STATS"; stats: ScanStats; state: ScanState }
   | { type: "SCAN_STATS_UNAVAILABLE"; reason: string };

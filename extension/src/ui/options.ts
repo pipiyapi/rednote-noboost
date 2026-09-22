@@ -7,7 +7,6 @@ const KEYS = {
   apiKey: "typesafeApiKey",
   commercial: "filterCommercial",
   emotional: "filterEmotional",
-  autoScan: "autoScanEnabled",
 } as const;
 
 function el<T extends HTMLElement>(id: string): T {
@@ -21,10 +20,9 @@ const saveKeyButton = el<HTMLButtonElement>("save-key");
 const keyStatus = el<HTMLSpanElement>("key-status");
 const commercialToggle = el<HTMLInputElement>("toggle-commercial");
 const emotionalToggle = el<HTMLInputElement>("toggle-emotional");
-const autoScanToggle = el<HTMLInputElement>("toggle-autoscan");
 
 chrome.storage.local.get(
-  [KEYS.apiKey, KEYS.commercial, KEYS.emotional, KEYS.autoScan],
+  [KEYS.apiKey, KEYS.commercial, KEYS.emotional],
   (res: Record<string, unknown>) => {
     if (typeof res[KEYS.apiKey] === "string" && res[KEYS.apiKey] !== "") {
       // 只回显「已保存」，绝不把 Key 写回页面（避免被截屏或复制走）。
@@ -32,7 +30,6 @@ chrome.storage.local.get(
     }
     commercialToggle.checked = res[KEYS.commercial] !== false;
     emotionalToggle.checked = res[KEYS.emotional] === true;
-    autoScanToggle.checked = res[KEYS.autoScan] !== false;
   },
 );
 
@@ -57,8 +54,4 @@ commercialToggle.addEventListener("change", () => {
 
 emotionalToggle.addEventListener("change", () => {
   void chrome.storage.local.set({ [KEYS.emotional]: emotionalToggle.checked });
-});
-
-autoScanToggle.addEventListener("change", () => {
-  void chrome.storage.local.set({ [KEYS.autoScan]: autoScanToggle.checked });
 });

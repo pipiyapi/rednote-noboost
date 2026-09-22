@@ -10,7 +10,7 @@ import { classifyNote } from "./jevClient";
 
 chrome.runtime.onInstalled.addListener(() => {
   void chrome.storage.local
-    .get(["filterCommercial", "filterEmotional", "autoScanEnabled"])
+    .get(["filterCommercial", "filterEmotional"])
     .then((res: Record<string, unknown>) => {
       const patch: Record<string, unknown> = {};
       // 首次安装的默认值：只开商业推广过滤器，情绪类默认关闭。
@@ -18,7 +18,6 @@ chrome.runtime.onInstalled.addListener(() => {
       // 建议先建立对商业判定的信任，再决定是否默认开启（待评估确认）。
       if (res["filterCommercial"] === undefined) patch["filterCommercial"] = true;
       if (res["filterEmotional"] === undefined) patch["filterEmotional"] = false;
-      if (res["autoScanEnabled"] === undefined) patch["autoScanEnabled"] = true;
       if (Object.keys(patch).length > 0) return chrome.storage.local.set(patch);
       return undefined;
     });
