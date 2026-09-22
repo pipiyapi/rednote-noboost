@@ -41,7 +41,7 @@ export type CardController = {
 
 export function createCardController(): CardController {
   const entries = new Map<string, Entry>();
-  const elementOwners = new WeakMap<HTMLElement, string>();
+  let elementOwners = new WeakMap<HTMLElement, string>();
 
   function bindElement(noteId: string, element: HTMLElement): void {
     const previousId = elementOwners.get(element);
@@ -132,7 +132,9 @@ export function createCardController(): CardController {
 
     reapplyAll(switches) {
       for (const entry of entries.values()) {
-        if (entry.element?.isConnected) render(entry, entry.element, switches);
+        if (entry.element && isCurrentElement(elementOwners.get(entry.element) ?? "", entry.element)) {
+          render(entry, entry.element, switches);
+        }
       }
     },
 
@@ -143,6 +145,8 @@ export function createCardController(): CardController {
           entry.element.classList.remove("rnb-blurred");
         }
       }
+      // 使所有在途异步任务立即过期；重新进入首页时 observer 会重新绑定。
+      elementOwners = new WeakMap<HTMLElement, string>();
     },
 
     forget(noteId) {

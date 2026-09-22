@@ -153,4 +153,22 @@ describe("虚拟列表节点复用", () => {
       "333333333333333333333333",
     ]);
   });
+
+  it("离开首页清除遮罩时使在途任务的节点绑定失效", async () => {
+    const noteId = "444444444444444444444444";
+    const card = reusableCard(noteId);
+    const controller = createCardController();
+    controller.markUndetermined(noteId, card.element);
+
+    let lateResultCanApply = false;
+    const lateResult = Promise.resolve().then(() => {
+      lateResultCanApply = controller.isCurrentElement(noteId, card.element);
+    });
+
+    controller.clearAllOverlays();
+    await lateResult;
+
+    expect(lateResultCanApply).toBe(false);
+    expect(controller.isCurrentElement(noteId, card.element)).toBe(false);
+  });
 });

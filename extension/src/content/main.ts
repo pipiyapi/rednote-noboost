@@ -172,7 +172,7 @@ function readSettings(): void {
         emotional: res["filterEmotional"] === true,
       };
       queue.setPaused(!autoScanEnabled);
-      controller.reapplyAll(switches);
+      if (running) controller.reapplyAll(switches);
     },
   );
 }
@@ -188,7 +188,7 @@ chrome.storage.onChanged.addListener((changes: Record<string, chrome.storage.Sto
       emotional: changes["filterEmotional"]?.newValue === true,
     };
     // 开关只影响渲染，不重新调用 API —— 已判定的笔记用已有结果重放即可。
-    controller.reapplyAll(switches);
+    if (running) controller.reapplyAll(switches);
   }
 });
 
