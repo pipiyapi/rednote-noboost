@@ -9,7 +9,13 @@
 
 import type { DecisionStatus, FailureKind, InputSource } from "../contracts/types";
 import { DECISION_RULES_VERSION, decide } from "../shared/decide";
-import { MODEL, RUBRIC_VERSION, buildQuestions, type JevAnswers } from "../shared/rubric";
+import {
+  MODEL,
+  RUBRIC_VERSION,
+  buildQuestions,
+  type JevAnswers,
+  type QuestionSet,
+} from "../shared/rubric";
 
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 const TIMEOUT_MS = 15_000;
@@ -54,7 +60,7 @@ export async function classifyNote(text: string, source: InputSource): Promise<D
       return { status: "error", kind: mapHttpStatus(response.status), source };
     }
 
-    const answers = readAnswers(await response.json());
+    const answers = readAnswers(await response.json(), questions);
     if (!answers) {
       console.warn("[rnb] TypeSafe 响应结构不符合契约");
       return { status: "error", kind: "parse", source };
@@ -76,9 +82,34 @@ function mapHttpStatus(status: number): FailureKind {
   return "unknown";
 }
 
-function readAnswers(data: unknown): JevAnswers | null {
+export function readAnswers(data: unknown, questions: QuestionSet): JevAnswers | null {
   if (typeof data !== "object" || data === null) return null;
   const answers = (data as { answers?: unknown }).answers;
   if (typeof answers !== "object" || answers === null) return null;
-  return answers as JevAnswers;
+
+  const parsed = answers as Record<string, unknown>;
+  for (const [key, question] of Object.entries(questions)) {
+    const answer = parsed[key];
+    if (typeof answer !== "object" || answer === null) return null;
+
+    const candidate = answer as { noul?: unknown; score?: unknown; choice?: unknown };
+    if (
+      question.type === "noul" &&
+      (typeof candidate.noul !== "number" ||
+        !Number.isFinite(candidate.noul) ||
+        candidate.noul < 0 ||
+        candidate.noul > 1)
+    ) {
+      return null;
+    }
+    if (
+      question.type === "score" &&
+      (typeof candidate.score !== "number" || !Number.isFinite(candidate.score))
+    ) {
+      return null;
+    }
+    if (question.type === "choice" && typeof candidate.choice !== "string") return null;
+  }
+
+  return parsed as JevAnswers;
 }

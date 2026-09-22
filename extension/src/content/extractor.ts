@@ -8,7 +8,8 @@
 // 关键原理：卡片上那些「页面已有数据」通常是页面世界的 JS 变量（SSR 内嵌状态
 // 树）。content script 跑在隔离世界，读不到页面世界的变量。要读它必须显式选择
 // 一条跨世界通道（MAIN world 脚本 / 注入 script 标签后 postMessage 回传），
-// 而且那个通道里绝不能出现 API Key。TODO(探针 A)：确认首页数据里到底有没有正文。
+// 而且那个通道里绝不能出现 API Key。真实页面探针已经确认：首页 DOM 与
+// __INITIAL_STATE__ 只有标题等卡片信息，没有笔记正文，因此首个闭环使用标题。
 
 import type { InputSource } from "../contracts/types";
 
@@ -27,12 +28,9 @@ export type ExtractedContent = {
  */
 const MIN_TEXT_LENGTH = 4;
 
-/** TODO(探针 A)：填入真实标题选择器。 */
-const TITLE_SELECTOR = "";
+const TITLE_SELECTOR = "a.title";
 
 export function extractNoteText(card: HTMLElement): ExtractedContent | null {
-  if (!TITLE_SELECTOR) return null; // 选择器未确认：不做任何事
-
   const titleEl = card.querySelector<HTMLElement>(TITLE_SELECTOR);
   const title = titleEl?.textContent?.trim() ?? "";
   if (title.length < MIN_TEXT_LENGTH) return null;
@@ -47,7 +45,7 @@ export function extractNoteText(card: HTMLElement): ExtractedContent | null {
   };
 }
 
-/** TODO(探针 A)：确认首页数据是否含正文；若需要跨世界读取，只在 MAIN world 侧读纯文本。 */
+/** 首页现有数据不含正文；详情请求与 OCR 留到后续里程碑。 */
 function readPageText(_card: HTMLElement): string | null {
   return null;
 }
