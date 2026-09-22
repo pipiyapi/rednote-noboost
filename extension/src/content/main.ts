@@ -73,6 +73,7 @@ function onDiscover(note: DiscoveredNote): void {
 
 async function processNote(job: QueueJob): Promise<void> {
   const { noteId, element } = job;
+  if (!controller.isCurrentElement(noteId, element)) return;
 
   const extracted = extractNoteText(element);
   if (!extracted) {
@@ -82,6 +83,7 @@ async function processNote(job: QueueJob): Promise<void> {
   }
 
   const first = await classify(noteId, extracted.text, extracted.source);
+  if (!controller.isCurrentElement(noteId, element)) return;
   if (!first || first.status !== "uncertain") {
     settle(noteId, element, first ?? { status: "error", kind: "unknown", source: extracted.source });
     return;
@@ -89,6 +91,7 @@ async function processNote(job: QueueJob): Promise<void> {
 
   // 两阶段漏斗：只有第一轮不确定，才值得动用昂贵的 OCR。
   const ocrText = await recognizeCoverText(noteId, element);
+  if (!controller.isCurrentElement(noteId, element)) return;
   if (!ocrText) {
     settle(noteId, element, first);
     return;
@@ -96,10 +99,12 @@ async function processNote(job: QueueJob): Promise<void> {
 
   const source: InputSource = extracted.pageText ? "title+page_text+ocr" : "title+ocr";
   const second = await classify(noteId, `${extracted.text}\n\n${ocrText}`, source);
+  if (!controller.isCurrentElement(noteId, element)) return;
   settle(noteId, element, second ?? first);
 }
 
 function settle(noteId: string, element: HTMLElement, decision: DecisionStatus): void {
+  if (!controller.isCurrentElement(noteId, element)) return;
   controller.apply(noteId, element, decision, switches);
   stats.decided += 1;
   switch (decision.status) {

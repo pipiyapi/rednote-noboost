@@ -28,6 +28,8 @@ export type CardController = {
   markUndetermined(noteId: string, element: HTMLElement): void;
   /** 节点重挂时重放已有状态。返回 true 表示该笔记已判定过，不需要再排队。 */
   attach(noteId: string, element: HTMLElement, switches: FilterSwitches): boolean;
+  /** 异步结果落地前确认：节点仍连接、DOM 身份未变，且仍归这篇笔记所有。 */
+  isCurrentElement(noteId: string, element: HTMLElement): boolean;
   apply(noteId: string, element: HTMLElement, decision: DecisionStatus, switches: FilterSwitches): void;
   getDecision(noteId: string): NoteStatus | undefined;
   /** 开关变化后重放全部已判定卡片（不重新调用 API）。 */
@@ -39,6 +41,27 @@ export type CardController = {
 
 export function createCardController(): CardController {
   const entries = new Map<string, Entry>();
+  const elementOwners = new WeakMap<HTMLElement, string>();
+
+  function bindElement(noteId: string, element: HTMLElement): void {
+    const previousId = elementOwners.get(element);
+    if (previousId && previousId !== noteId) {
+      const previousEntry = entries.get(previousId);
+      if (previousEntry?.element === element) previousEntry.element = null;
+      // 虚拟列表把同一节点换给新笔记时，新内容必须先恢复为可见。
+      removeOverlay(element);
+      element.classList.remove("rnb-blurred");
+    }
+    elementOwners.set(element, noteId);
+  }
+
+  function isCurrentElement(noteId: string, element: HTMLElement): boolean {
+    return (
+      element.isConnected &&
+      elementOwners.get(element) === noteId &&
+      element.getAttribute("data-note-id") === noteId
+    );
+  }
 
   function shouldBlur(decision: FilteredStatus, switches: FilterSwitches): boolean {
     if (decision.status === "filter_commercial") return switches.commercial;
@@ -65,6 +88,7 @@ export function createCardController(): CardController {
 
   return {
     markUndetermined(noteId, element) {
+      bindElement(noteId, element);
       const existing = entries.get(noteId);
       if (existing) {
         existing.element = element;
@@ -80,12 +104,17 @@ export function createCardController(): CardController {
     attach(noteId, element, switches) {
       const entry = entries.get(noteId);
       if (!entry || entry.decision.status === "undetermined") return false;
+      bindElement(noteId, element);
       entry.element = element;
       render(entry, element, switches);
       return true;
     },
 
+    isCurrentElement,
+
     apply(noteId, element, decision, switches) {
+      // 旧请求晚到时不能重新夺回已经换绑给新笔记的节点。
+      if (!isCurrentElement(noteId, element)) return;
       const entry = entries.get(noteId) ?? {
         decision,
         revealedByUser: false,
@@ -117,6 +146,10 @@ export function createCardController(): CardController {
     },
 
     forget(noteId) {
+      const entry = entries.get(noteId);
+      if (entry?.element && elementOwners.get(entry.element) === noteId) {
+        elementOwners.delete(entry.element);
+      }
       entries.delete(noteId);
     },
   };

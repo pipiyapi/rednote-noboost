@@ -31,7 +31,7 @@ export type FeedObserver = {
 };
 
 export function createFeedObserver(onDiscover: (note: DiscoveredNote) => void): FeedObserver {
-  const seenNoteByElement = new WeakMap<Element, string>();
+  let seenNoteByElement = new WeakMap<Element, string>();
   let timer: number | null = null;
 
   const schedule = (): void => {
@@ -57,6 +57,8 @@ export function createFeedObserver(onDiscover: (note: DiscoveredNote) => void): 
 
   return {
     start(): void {
+      // stop() 会移除外观；再次进入首页时必须重新上报已有节点以重放判定。
+      seenNoteByElement = new WeakMap<Element, string>();
       observer.observe(document.body, {
         childList: true,
         subtree: true,

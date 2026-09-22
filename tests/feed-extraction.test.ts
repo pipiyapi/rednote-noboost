@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createCardController, type CardController } from "../extension/src/content/cardController";
 import { extractNoteText } from "../extension/src/content/extractor";
-import { extractNoteId } from "../extension/src/content/feedObserver";
+import { createFeedObserver, extractNoteId } from "../extension/src/content/feedObserver";
 
 function fakeCard(options: {
   noteId?: string;
@@ -54,5 +55,102 @@ describe("小红书首页卡片提取", () => {
 
   it("空标题或占位短文本不送去计费判定", () => {
     expect(extractNoteText(fakeCard({ title: "  嗯  " }) as HTMLElement)).toBeNull();
+  });
+});
+
+type IdentityAwareController = CardController & {
+  isCurrentElement(noteId: string, element: HTMLElement): boolean;
+};
+
+function reusableCard(noteId: string): {
+  element: HTMLElement;
+  setNoteId(next: string): void;
+  addBlur(): void;
+  isBlurred(): boolean;
+  overlayRemoved(): boolean;
+} {
+  let currentId = noteId;
+  let removed = false;
+  const classes = new Set<string>();
+  const element = {
+    isConnected: true,
+    getAttribute(name: string) {
+      return name === "data-note-id" ? currentId : null;
+    },
+    querySelector(selector: string) {
+      if (selector === ":scope > .rnb-overlay" && !removed) {
+        return { remove: () => { removed = true; } };
+      }
+      return null;
+    },
+    classList: {
+      add: (...names: string[]) => names.forEach((name) => classes.add(name)),
+      remove: (...names: string[]) => names.forEach((name) => classes.delete(name)),
+      contains: (name: string) => classes.has(name),
+    },
+  } as unknown as HTMLElement;
+
+  return {
+    element,
+    setNoteId: (next) => { currentId = next; },
+    addBlur: () => classes.add("rnb-blurred"),
+    isBlurred: () => classes.has("rnb-blurred"),
+    overlayRemoved: () => removed,
+  };
+}
+
+describe("虚拟列表节点复用", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("节点换绑新笔记时立即清理旧遮罩并使旧任务失效", async () => {
+    const firstId = "111111111111111111111111";
+    const secondId = "222222222222222222222222";
+    const card = reusableCard(firstId);
+    const controller = createCardController() as IdentityAwareController;
+
+    expect(typeof controller.isCurrentElement).toBe("function");
+    controller.markUndetermined(firstId, card.element);
+    card.addBlur();
+
+    let staleResultApplied = false;
+    const lateResult = Promise.resolve().then(() => {
+      staleResultApplied = controller.isCurrentElement(firstId, card.element);
+    });
+
+    card.setNoteId(secondId);
+    controller.markUndetermined(secondId, card.element);
+    await lateResult;
+
+    expect(controller.isCurrentElement(firstId, card.element)).toBe(false);
+    expect(controller.isCurrentElement(secondId, card.element)).toBe(true);
+    expect(staleResultApplied).toBe(false);
+    expect(card.isBlurred()).toBe(false);
+    expect(card.overlayRemoved()).toBe(true);
+  });
+
+  it("观察器停止后重新启动会重新上报当前卡片以重放判定", () => {
+    const card = reusableCard("333333333333333333333333").element;
+    const discovered: string[] = [];
+    vi.stubGlobal("document", {
+      body: {},
+      querySelectorAll: () => [card],
+    });
+    vi.stubGlobal(
+      "MutationObserver",
+      class {
+        observe(): void {}
+        disconnect(): void {}
+      },
+    );
+
+    const observer = createFeedObserver((note) => discovered.push(note.noteId));
+    observer.start();
+    observer.stop();
+    observer.start();
+
+    expect(discovered).toEqual([
+      "333333333333333333333333",
+      "333333333333333333333333",
+    ]);
   });
 });
