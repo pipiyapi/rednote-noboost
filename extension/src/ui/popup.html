@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>RedNote NoBoost</title>
+    <style>
+      body {
+        width: 260px;
+        margin: 0;
+        padding: 12px 14px 14px;
+        color: #222;
+        font: 13px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 14px;
+      }
+      #status {
+        margin: 0 0 10px;
+        color: #666;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      td {
+        padding: 2px 0;
+      }
+      td.num {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      a {
+        display: inline-block;
+        margin-top: 10px;
+        color: #d4380d;
+      }
+      .muted {
+        color: #999;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>RedNote NoBoost</h1>
+    <p id="status">正在读取状态…</p>
+    <table>
+      <tr><td>已发现</td><td class="num" id="stat-discovered">–</td></tr>
+      <tr><td>已判定</td><td class="num" id="stat-decided">–</td></tr>
+      <tr><td>保留</td><td class="num" id="stat-keep">–</td></tr>
+      <tr><td>推广</td><td class="num" id="stat-commercial">–</td></tr>
+      <tr><td>情绪</td><td class="num" id="stat-emotional">–</td></tr>
+      <tr><td>两类同时</td><td class="num" id="stat-both">–</td></tr>
+      <tr><td>依据不足</td><td class="num" id="stat-uncertain">–</td></tr>
+      <tr><td>失败</td><td class="num" id="stat-error">–</td></tr>
+    </table>
+    <a href="#" id="options-link">打开设置</a>
+
+    <script type="module" src="../dist/popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>RedNote NoBoost 设置</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px 24px 32px;
+        max-width: 560px;
+        color: #222;
+        font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 4px;
+      }
+      p.hint {
+        margin: 0 0 20px;
+        color: #666;
+        font-size: 13px;
+      }
+      fieldset {
+        margin: 0 0 18px;
+        padding: 12px 14px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+      }
+      legend {
+        padding: 0 6px;
+        font-weight: 600;
+      }
+      label.row {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        margin: 8px 0;
+      }
+      .row-desc {
+        color: #666;
+        font-size: 12px;
+      }
+      input[type="password"] {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 6px 8px;
+        border: 1px solid #bbb;
+        border-radius: 6px;
+      }
+      button {
+        margin-top: 8px;
+        padding: 6px 14px;
+        border: 1px solid #999;
+        border-radius: 6px;
+        background: #fff;
+        cursor: pointer;
+      }
+      #key-status {
+        margin-left: 10px;
+        font-size: 13px;
+      }
+      .ok {
+        color: #237804;
+      }
+      .err {
+        color: #cf1322;
+      }
+      .warn {
+        padding: 10px 12px;
+        border-left: 3px solid #d4380d;
+        background: #fff7f0;
+        color: #614700;
+        font-size: 13px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>RedNote NoBoost</h1>
+    <p class="hint">仅在小红书网页版首页推荐流生效。判定失败或依据不足时，内容保持可见。</p>
+
+    <fieldset>
+      <legend>TypeSafe / Jev API Key</legend>
+      <p class="row-desc">
+        使用你自己的 Key。它只保存在浏览器本地扩展存储中，只有后台 service worker 读取并发送，
+        不会上传到我们自己的服务器（本项目没有后端）。
+      </p>
+      <input id="api-key" type="password" autocomplete="off" placeholder="粘贴你的 API Key" />
+      <button id="save-key" type="button">保存</button>
+      <span id="key-status"></span>
+    </fieldset>
+
+    <fieldset>
+      <legend>过滤开关</legend>
+      <label class="row">
+        <input id="toggle-commercial" type="checkbox" />
+        <span>
+          商业推广垃圾
+          <span class="row-desc">（带货、私信/加群引流、软广等；包含真实测评与具体数据的内容不应被过滤）</span>
+        </span>
+      </label>
+      <label class="row">
+        <input id="toggle-emotional" type="checkbox" />
+        <span>
+          情绪垃圾
+          <span class="row-desc">（纯宣泄无事实、制造对立、焦虑诱导；真实经历与求助不应被过滤）</span>
+        </span>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>扫描</legend>
+      <label class="row">
+        <input id="toggle-autoscan" type="checkbox" />
+        <span>随滚动自动扫描 <span class="row-desc">（关闭后不再发现新笔记，已显示的内容不受影响）</span></span>
+      </label>
+    </fieldset>
+
+    <p class="warn">
+      当前为开发骨架：问题集与阈值尚未标定，判定链路会统一返回「依据不足」，因此不会模糊任何内容。
+      这不是故障，而是 fail open 的默认状态。
+    </p>
+
+    <script type="module" src="../dist/options.js"></script>
+  </body>
+</html>

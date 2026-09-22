@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "RedNote NoBoost (dev prototype)",
+  "version": "0.1.0",
+  "description": "个人原型：在小红书网页版首页推荐流中，用 TypeSafe/Jev 识别并弱化明显的商业推广与无信息价值的情绪内容。仅本地加载测试，未发布到任何扩展商店。",
+  "minimum_chrome_version": "111",
+
+  "action": {
+    "default_popup": "src/ui/popup.html"
+  },
+  "options_page": "src/ui/options.html",
+  "background": {
+    "service_worker": "dist/service-worker.js",
+    "type": "module"
+  },
+
+  "permissions": ["storage"],
+
+  "host_permissions": [
+    "https://www.xiaohongshu.com/*",
+    "https://api.typesafe.ai/*"
+  ],
+
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.xiaohongshu.com/",
+        "https://www.xiaohongshu.com/explore*"
+      ],
+      "js": ["dist/content.js"],
+      "css": ["src/content/styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}

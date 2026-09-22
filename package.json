@@ -1,0 +1,22 @@
+{
+  "name": "rednote-noboost",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chrome MV3 prototype: blur commercial-promo and empty-emotion notes in the Xiaohongshu web home feed using TypeSafe/Jev (personal, local-only).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/chrome": "*",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}
