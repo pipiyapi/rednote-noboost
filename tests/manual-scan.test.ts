@@ -69,4 +69,38 @@ describe("手动扫描控制", () => {
     expect(tracker.record("note-b")).toBe(true);
     expect(tracker.size).toBe(2);
   });
+
+  it("暂停后立即恢复时，新代次的同一笔记会等待旧请求结束后继续", async () => {
+    let releaseFirst: (() => void) | undefined;
+    const firstBlocked = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let finishSecond: (() => void) | undefined;
+    const secondFinished = new Promise<void>((resolve) => { finishSecond = resolve; });
+    const processedGenerations: number[] = [];
+    const queue = scanQueueModule.createScanQueue({
+      concurrency: 1,
+      process: async (job) => {
+        processedGenerations.push(job.generation);
+        if (processedGenerations.length === 1) await firstBlocked;
+        if (processedGenerations.length === 2) finishSecond?.();
+      },
+    });
+    const control = createManualScanControl({
+      setPaused: (paused) => queue.setPaused(paused),
+      restartDiscovery: vi.fn(),
+      clearPending: () => queue.clear(),
+    });
+    const element = { isConnected: true } as HTMLElement;
+
+    control.start();
+    queue.enqueue({ noteId: "note-a", element, generation: control.generation });
+    control.pause();
+    control.start();
+    queue.enqueue({ noteId: "note-a", element, generation: control.generation });
+
+    expect(queue.pendingCount).toBe(1);
+    releaseFirst?.();
+    await secondFinished;
+
+    expect(processedGenerations).toEqual([1, 3]);
+  });
 });

@@ -82,7 +82,11 @@ function onDiscover(note: DiscoveredNote): void {
   if (!scanControl.enabled) return;
 
   if (discoveredNotes.record(note.noteId)) stats.discovered += 1;
-  queue.enqueue({ noteId: note.noteId, element: note.element });
+  queue.enqueue({
+    noteId: note.noteId,
+    element: note.element,
+    generation: scanControl.generation,
+  });
 }
 
 async function processNote(job: QueueJob): Promise<void> {

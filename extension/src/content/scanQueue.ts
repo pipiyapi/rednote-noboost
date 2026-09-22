@@ -12,6 +12,7 @@
 export type QueueJob = {
   noteId: string;
   element: HTMLElement;
+  generation: number;
 };
 
 export type ScanQueue = {
@@ -93,22 +94,25 @@ export function createScanQueue(options: {
 }): ScanQueue {
   const concurrency = Math.max(1, options.concurrency ?? 3);
   const pending: QueueJob[] = [];
-  const queuedIds = new Set<string>();
-  const inFlightIds = new Set<string>();
+  const queuedGenerations = new Map<string, number>();
+  const inFlightGenerations = new Map<string, number>();
   let paused = false;
 
   function pump(): void {
-    while (!paused && inFlightIds.size < concurrency && pending.length > 0) {
-      const job = pending.shift();
-      if (!job) break;
+    while (!paused && inFlightGenerations.size < concurrency && pending.length > 0) {
+      // 同一 noteId 的新代次任务必须等旧代次完成；其他笔记不应被它阻塞。
+      const readyIndex = pending.findIndex((job) => !inFlightGenerations.has(job.noteId));
+      if (readyIndex < 0) break;
+      const [job] = pending.splice(readyIndex, 1);
+      if (!job) continue;
 
-      queuedIds.delete(job.noteId);
+      queuedGenerations.delete(job.noteId);
 
       // 卡片已被虚拟化回收：直接丢弃，不浪费一次 API 调用。
       // 该笔记若再次进入视口，会被重新发现并按 noteId 重新排队。
       if (!job.element.isConnected) continue;
 
-      inFlightIds.add(job.noteId);
+      inFlightGenerations.set(job.noteId, job.generation);
       void options
         .process(job)
         .catch((err: unknown) => {
@@ -116,7 +120,9 @@ export function createScanQueue(options: {
           console.warn("[rnb] 扫描任务失败（内容保持可见）", err);
         })
         .finally(() => {
-          inFlightIds.delete(job.noteId);
+          if (inFlightGenerations.get(job.noteId) === job.generation) {
+            inFlightGenerations.delete(job.noteId);
+          }
           pump();
         });
     }
@@ -124,8 +130,19 @@ export function createScanQueue(options: {
 
   return {
     enqueue(job: QueueJob): void {
-      if (queuedIds.has(job.noteId) || inFlightIds.has(job.noteId)) return;
-      queuedIds.add(job.noteId);
+      const queuedGeneration = queuedGenerations.get(job.noteId);
+      if (queuedGeneration === job.generation) return;
+      if (inFlightGenerations.get(job.noteId) === job.generation) return;
+
+      // 同一笔记若又产生更新代次，只保留最新的待办。
+      if (queuedGeneration !== undefined) {
+        const index = pending.findIndex((item) => item.noteId === job.noteId);
+        if (index >= 0) pending[index] = job;
+        queuedGenerations.set(job.noteId, job.generation);
+        return;
+      }
+
+      queuedGenerations.set(job.noteId, job.generation);
       pending.push(job);
       pump();
     },
@@ -135,13 +152,13 @@ export function createScanQueue(options: {
     },
     clear(): void {
       pending.length = 0;
-      queuedIds.clear();
+      queuedGenerations.clear();
     },
     get pendingCount(): number {
       return pending.length;
     },
     get inFlightCount(): number {
-      return inFlightIds.size;
+      return inFlightGenerations.size;
     },
   };
 }
