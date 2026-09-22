@@ -71,6 +71,7 @@ function reusableCard(noteId: string): {
 } {
   let currentId = noteId;
   let removed = false;
+  let overlayPresent = false;
   const classes = new Set<string>();
   const element = {
     isConnected: true,
@@ -78,10 +79,13 @@ function reusableCard(noteId: string): {
       return name === "data-note-id" ? currentId : null;
     },
     querySelector(selector: string) {
-      if (selector === ":scope > .rnb-overlay" && !removed) {
-        return { remove: () => { removed = true; } };
+      if (selector === ":scope > .rnb-overlay" && overlayPresent) {
+        return { remove: () => { overlayPresent = false; removed = true; } };
       }
       return null;
+    },
+    appendChild(child: { className?: string }) {
+      if (child.className === "rnb-overlay") overlayPresent = true;
     },
     classList: {
       add: (...names: string[]) => names.forEach((name) => classes.add(name)),
@@ -93,7 +97,7 @@ function reusableCard(noteId: string): {
   return {
     element,
     setNoteId: (next) => { currentId = next; },
-    addBlur: () => classes.add("rnb-blurred"),
+    addBlur: () => { classes.add("rnb-blurred"); overlayPresent = true; },
     isBlurred: () => classes.has("rnb-blurred"),
     overlayRemoved: () => removed,
   };
@@ -170,5 +174,45 @@ describe("虚拟列表节点复用", () => {
 
     expect(lateResultCanApply).toBe(false);
     expect(controller.isCurrentElement(noteId, card.element)).toBe(false);
+  });
+
+  it("停用后节点换绑再重放设置时不会恢复旧笔记遮罩", () => {
+    vi.stubGlobal("document", {
+      createElement: () => ({
+        className: "",
+        textContent: "",
+        appendChild(): void {},
+        append(): void {},
+        addEventListener(): void {},
+      }),
+    });
+    const oldId = "555555555555555555555555";
+    const currentId = "666666666666666666666666";
+    const oldCard = reusableCard(oldId);
+    const priorCurrentCard = reusableCard(currentId);
+    const controller = createCardController();
+    const switches = { commercial: true, emotional: true };
+
+    // 让 currentId 比 oldId 更早进入 Map，复现旧条目最后覆盖新条目的顺序。
+    controller.markUndetermined(currentId, priorCurrentCard.element);
+    controller.apply(currentId, priorCurrentCard.element, { status: "keep", source: "title" }, switches);
+    controller.markUndetermined(oldId, oldCard.element);
+    controller.apply(
+      oldId,
+      oldCard.element,
+      {
+        status: "filter_commercial",
+        reasons: ["commercial_hard_sell"],
+        source: "title",
+      },
+      switches,
+    );
+
+    controller.clearAllOverlays();
+    oldCard.setNoteId(currentId);
+    expect(controller.attach(currentId, oldCard.element, switches)).toBe(true);
+    controller.reapplyAll(switches);
+
+    expect(oldCard.isBlurred()).toBe(false);
   });
 });

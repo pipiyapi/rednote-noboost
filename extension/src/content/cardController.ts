@@ -131,8 +131,8 @@ export function createCardController(): CardController {
     },
 
     reapplyAll(switches) {
-      for (const entry of entries.values()) {
-        if (entry.element && isCurrentElement(elementOwners.get(entry.element) ?? "", entry.element)) {
+      for (const [noteId, entry] of entries) {
+        if (entry.element && isCurrentElement(noteId, entry.element)) {
           render(entry, entry.element, switches);
         }
       }
@@ -144,6 +144,7 @@ export function createCardController(): CardController {
           removeOverlay(entry.element);
           entry.element.classList.remove("rnb-blurred");
         }
+        entry.element = null;
       }
       // 使所有在途异步任务立即过期；重新进入首页时 observer 会重新绑定。
       elementOwners = new WeakMap<HTMLElement, string>();
