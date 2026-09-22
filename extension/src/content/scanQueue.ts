@@ -24,9 +24,30 @@ export type ScanQueue = {
 
 export type ManualScanControl = {
   readonly enabled: boolean;
+  readonly generation: number;
+  isActive(generation: number): boolean;
   start(): void;
   pause(): void;
 };
+
+export type UniqueNoteTracker = {
+  record(noteId: string): boolean;
+  readonly size: number;
+};
+
+export function createUniqueNoteTracker(): UniqueNoteTracker {
+  const ids = new Set<string>();
+  return {
+    record(noteId): boolean {
+      const previousSize = ids.size;
+      ids.add(noteId);
+      return ids.size !== previousSize;
+    },
+    get size(): number {
+      return ids.size;
+    },
+  };
+}
 
 /** 页面级手动开关：每次 content script 启动都从暂停开始，不持久化到 storage。 */
 export function createManualScanControl(actions: {
@@ -35,15 +56,23 @@ export function createManualScanControl(actions: {
   clearPending(): void;
 }): ManualScanControl {
   let enabled = false;
+  let generation = 0;
   actions.setPaused(true);
 
   return {
     get enabled(): boolean {
       return enabled;
     },
+    get generation(): number {
+      return generation;
+    },
+    isActive(candidate): boolean {
+      return enabled && generation === candidate;
+    },
     start(): void {
       if (enabled) return;
       enabled = true;
+      generation += 1;
       // 先重新发现当前卡片并排入暂停中的队列，再统一放行，避免漏掉首屏。
       actions.restartDiscovery();
       actions.setPaused(false);
@@ -51,6 +80,7 @@ export function createManualScanControl(actions: {
     pause(): void {
       if (!enabled) return;
       enabled = false;
+      generation += 1;
       actions.setPaused(true);
       actions.clearPending();
     },

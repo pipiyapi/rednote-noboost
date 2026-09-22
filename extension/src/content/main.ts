@@ -10,7 +10,12 @@ import { extractNoteText } from "./extractor";
 import { createFeedObserver, type DiscoveredNote } from "./feedObserver";
 import { recognizeCoverText } from "./ocr";
 import { isHomeFeed, onRouteChange } from "./routeGate";
-import { createManualScanControl, createScanQueue, type QueueJob } from "./scanQueue";
+import {
+  createManualScanControl,
+  createScanQueue,
+  createUniqueNoteTracker,
+  type QueueJob,
+} from "./scanQueue";
 
 const CLASSIFY_CONCURRENCY = 3;
 
@@ -36,6 +41,7 @@ let running = false;
 const controller = createCardController();
 const observer = createFeedObserver(onDiscover);
 const queue = createScanQueue({ process: processNote, concurrency: CLASSIFY_CONCURRENCY });
+const discoveredNotes = createUniqueNoteTracker();
 const scanControl = createManualScanControl({
   setPaused: (paused) => queue.setPaused(paused),
   clearPending: () => queue.clear(),
@@ -75,13 +81,14 @@ function onDiscover(note: DiscoveredNote): void {
   controller.markUndetermined(note.noteId, note.element);
   if (!scanControl.enabled) return;
 
-  stats.discovered += 1;
+  if (discoveredNotes.record(note.noteId)) stats.discovered += 1;
   queue.enqueue({ noteId: note.noteId, element: note.element });
 }
 
 async function processNote(job: QueueJob): Promise<void> {
   const { noteId, element } = job;
-  if (!controller.isCurrentElement(noteId, element)) return;
+  const generation = scanControl.generation;
+  if (!scanControl.isActive(generation) || !controller.isCurrentElement(noteId, element)) return;
 
   const extracted = extractNoteText(element);
   if (!extracted) {
@@ -91,7 +98,10 @@ async function processNote(job: QueueJob): Promise<void> {
   }
 
   const first = await classify(noteId, extracted.text, extracted.source);
-  if (!controller.isCurrentElement(noteId, element)) return;
+  if (
+    !scanControl.isActive(generation) ||
+    !controller.isCurrentElement(noteId, element)
+  ) return;
   if (!first || first.status !== "uncertain") {
     settle(noteId, element, first ?? { status: "error", kind: "unknown", source: extracted.source });
     return;
@@ -99,15 +109,22 @@ async function processNote(job: QueueJob): Promise<void> {
 
   // 两阶段漏斗：只有第一轮不确定，才值得动用昂贵的 OCR。
   const ocrText = await recognizeCoverText(noteId, element);
-  if (!controller.isCurrentElement(noteId, element)) return;
+  if (
+    !scanControl.isActive(generation) ||
+    !controller.isCurrentElement(noteId, element)
+  ) return;
   if (!ocrText) {
     settle(noteId, element, first);
     return;
   }
 
   const source: InputSource = extracted.pageText ? "title+page_text+ocr" : "title+ocr";
+  if (!scanControl.isActive(generation)) return;
   const second = await classify(noteId, `${extracted.text}\n\n${ocrText}`, source);
-  if (!controller.isCurrentElement(noteId, element)) return;
+  if (
+    !scanControl.isActive(generation) ||
+    !controller.isCurrentElement(noteId, element)
+  ) return;
   settle(noteId, element, second ?? first);
 }
 
