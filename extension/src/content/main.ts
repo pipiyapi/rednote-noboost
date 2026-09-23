@@ -16,24 +16,11 @@ import {
   createUniqueNoteTracker,
   type QueueJob,
 } from "./scanQueue";
+import { createEmptyStats, recordDecision } from "./scanStats";
 
 const CLASSIFY_CONCURRENCY = 3;
 
-function emptyStats(): ScanStats {
-  return {
-    discovered: 0,
-    decided: 0,
-    cancelled: 0,
-    keep: 0,
-    filterCommercial: 0,
-    filterEmotional: 0,
-    filterBoth: 0,
-    uncertain: 0,
-    error: 0,
-  };
-}
-
-let stats: ScanStats = emptyStats();
+let stats: ScanStats = createEmptyStats();
 // 默认值待评估确认：建议 V1 先只开商业推广过滤器（情绪类误判代价最高）。
 let switches: FilterSwitches = { commercial: true, emotional: false };
 let running = false;
@@ -134,30 +121,15 @@ async function processNote(job: QueueJob): Promise<void> {
 
 function settle(noteId: string, element: HTMLElement, decision: DecisionStatus): void {
   if (!controller.isCurrentElement(noteId, element)) return;
-  controller.apply(noteId, element, decision, switches);
-  stats.decided += 1;
-  switch (decision.status) {
-    case "keep":
-      stats.keep += 1;
-      break;
-    case "filter_commercial":
-      stats.filterCommercial += 1;
-      break;
-    case "filter_emotional":
-      stats.filterEmotional += 1;
-      break;
-    case "filter_both":
-      stats.filterBoth += 1;
-      break;
-    case "uncertain":
-      stats.uncertain += 1;
-      break;
-    case "error":
-      stats.error += 1;
-      break;
-    default:
-      break;
+
+  // 失败不是结论：原因同时进日志与统计，方便定位，也允许下次扫描重试。
+  if (decision.status === "error") {
+    console.warn(`[rnb] 判定失败：${decision.kind}（noteId=${noteId}）`);
   }
+
+  // 重试会覆盖同一篇笔记的旧结论：先把旧的回退，保证「已判定」按笔记计数。
+  recordDecision(stats, controller.getDecision(noteId), decision);
+  controller.apply(noteId, element, decision, switches);
 }
 
 // ---------------------------------------------------------------- 与 worker 通信

@@ -62,6 +62,23 @@
       .muted {
         color: #999;
       }
+      .breakdown {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px dashed #ddd;
+      }
+      .breakdown-title {
+        color: #999;
+        font-size: 12px;
+      }
+      .breakdown table {
+        margin-top: 2px;
+      }
+      .breakdown td {
+        padding: 1px 0;
+        color: #666;
+        font-size: 12px;
+      }
     </style>
   </head>
   <body>
@@ -81,6 +98,10 @@
       <tr><td>依据不足</td><td class="num" id="stat-uncertain">–</td></tr>
       <tr><td>失败</td><td class="num" id="stat-error">–</td></tr>
     </table>
+    <div class="breakdown" id="error-breakdown" hidden>
+      <div class="breakdown-title">失败原因</div>
+      <table id="error-breakdown-rows"></table>
+    </div>
     <a href="#" id="options-link">打开设置</a>
 
     <script type="module" src="../../dist/popup.js"></script>

@@ -69,6 +69,12 @@ export type ScanStats = {
   filterBoth: number;
   uncertain: number;
   error: number;
+  /**
+   * 失败按原因分桶。
+   * 只给一个「失败」总数是不够的：auth / rate_limit / timeout / parse 的处置方式
+   * 完全不同，看不到原因既无法排查，也判断不出该改代码还是改配置。
+   */
+  errorsByKind: Record<FailureKind, number>;
 };
 
 /** 扫描器对外状态。 */

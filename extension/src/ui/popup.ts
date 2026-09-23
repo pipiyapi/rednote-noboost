@@ -1,7 +1,8 @@
 // Popup：当前页面的手动扫描控制与统计面板。
 
 import type { ContentToUi, UiToContent } from "../contracts/messages";
-import type { ScanState, ScanStats } from "../contracts/types";
+import type { FailureKind, ScanState, ScanStats } from "../contracts/types";
+import { FAILURE_KIND_LABELS } from "../shared/reasons";
 
 const STATE_LABELS: Record<ScanState, string> = {
   unconfigured: "未配置 API Key",
@@ -35,6 +36,42 @@ function renderStats(stats: ScanStats): void {
   setText("stat-both", String(stats.filterBoth));
   setText("stat-uncertain", String(stats.uncertain));
   setText("stat-error", String(stats.error));
+  renderErrorBreakdown(stats);
+}
+
+/**
+ * 失败原因明细。只显示实际出现过的原因：失败是 0 时整块隐藏。
+ *
+ * 为什么必须有这块：只给一个「失败 29」无法判断该改代码还是改配置 ——
+ * auth 要换 Key、rate_limit 要降并发、parse 要改解析、timeout 要重试。
+ */
+function renderErrorBreakdown(stats: ScanStats): void {
+  const container = document.getElementById("error-breakdown");
+  const rows = document.getElementById("error-breakdown-rows");
+  if (!container || !rows) return;
+
+  // 扩展重载后，页面里可能还是旧版 content script（stats 里没有 errorsByKind），
+  // 因此这里按可选处理，宁可少显示也不抛错。
+  const byKind = stats.errorsByKind as Partial<Record<FailureKind, number>> | undefined;
+  const kinds = Object.keys(FAILURE_KIND_LABELS) as FailureKind[];
+  const entries = kinds
+    .map((kind) => ({ kind, count: byKind?.[kind] ?? 0 }))
+    .filter((entry) => entry.count > 0);
+
+  rows.textContent = "";
+  container.hidden = entries.length === 0;
+
+  for (const entry of entries) {
+    const label = document.createElement("td");
+    label.textContent = FAILURE_KIND_LABELS[entry.kind];
+    const count = document.createElement("td");
+    count.className = "num";
+    count.textContent = String(entry.count);
+
+    const row = document.createElement("tr");
+    row.append(label, count);
+    rows.appendChild(row);
+  }
 }
 
 function setStatus(text: string, muted = false): void {

@@ -104,6 +104,9 @@ export function createCardController(): CardController {
     attach(noteId, element, switches) {
       const entry = entries.get(noteId);
       if (!entry || entry.decision.status === "undetermined") return false;
+      // 失败不是结论：返回 false 让上层重新排队重试它。
+      // 否则一次限流/超时就会把这篇笔记永久钉在「已处理」上，只有刷新页面才能重来。
+      if (entry.decision.status === "error") return false;
       bindElement(noteId, element);
       entry.element = element;
       render(entry, element, switches);
