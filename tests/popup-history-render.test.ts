@@ -1,0 +1,118 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createEmptyStats } from "../extension/src/content/scanStats";
+import { createScanHistoryStore } from "../extension/src/content/scanHistory";
+import { SCAN_PROTOCOL_VERSION } from "../extension/src/contracts/scanProtocol";
+
+/** 只模拟 DOM 消息/树操作；不声称验证浏览器布局。 */
+class TestNode {
+  children: TestNode[] = [];
+  dataset: Record<string, string> = {};
+  textContent = "";
+  className = "";
+  hidden = false;
+  disabled = false;
+  open = false;
+  listeners = new Map<string, () => void>();
+  constructor(readonly tagName = "div") {}
+  append(...nodes: TestNode[]): void { nodes.forEach((node) => this.appendChild(node)); }
+  appendChild(node: TestNode): TestNode {
+    if (node.tagName === "fragment") this.children.push(...node.children);
+    else this.children.push(node);
+    return node;
+  }
+  replaceChildren(...nodes: TestNode[]): void { this.children = []; this.append(...nodes); }
+  querySelectorAll(): TestNode[] { return this.children.filter((node) => node.open); }
+  addEventListener(event: string, callback: () => void): void { this.listeners.set(event, callback); }
+}
+
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.resetModules(); });
+
+async function mount(response: unknown, healthStatus = "healthy") {
+  const nodes = new Map<string, TestNode>();
+  const get = (id: string) => {
+    if (!nodes.has(id)) nodes.set(id, new TestNode());
+    return nodes.get(id)!;
+  };
+  const reload = vi.fn().mockResolvedValue(undefined);
+  const sendMessage = vi.fn().mockResolvedValue(response);
+  vi.stubGlobal("document", {
+    getElementById: get,
+    createElement: (tag: string) => new TestNode(tag),
+    createDocumentFragment: () => new TestNode("fragment"),
+  });
+  vi.stubGlobal("window", { setInterval: vi.fn(), close: vi.fn() });
+  vi.stubGlobal("chrome", {
+    runtime: { sendMessage: vi.fn().mockResolvedValue({ type: "OCR_HEALTH_RESULT", status: healthStatus, message: "自检状态" }) },
+    tabs: {
+      query: vi.fn().mockResolvedValue([{ id: 1, url: "https://www.xiaohongshu.com/explore" }]),
+      sendMessage, reload,
+    },
+    storage: { local: { get: (_keys: unknown, callback: (value: object) => void) => callback({}) } },
+  });
+  await import("../extension/src/ui/popup");
+  await vi.waitFor(() => expect(sendMessage).toHaveBeenCalled());
+  await Promise.resolve();
+  return { get, reload, sendMessage };
+}
+
+describe("popup 接收扫描响应并实际生成历史节点", () => {
+  it.each(["checking", "unavailable"])("OCR %s 时禁止开始扫描", async (healthStatus) => {
+    const { get, sendMessage } = await mount({
+      type: "SCAN_STATS", protocolVersion: SCAN_PROTOCOL_VERSION,
+      state: "paused", stats: createEmptyStats(), history: [],
+    }, healthStatus);
+    expect(get("start-scan").disabled).toBe(true);
+    expect(get("ocr-health-label").dataset.state).toBe(healthStatus);
+    get("start-scan").listeners.get("click")?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(sendMessage.mock.calls.some((call) => call[1].type === "START_SCAN")).toBe(false);
+  });
+
+  it("OCR 健康才允许开始扫描", async () => {
+    const { get } = await mount({
+      type: "SCAN_STATS", protocolVersion: SCAN_PROTOCOL_VERSION,
+      state: "paused", stats: createEmptyStats(), history: [],
+    });
+    expect(get("ocr-health-label").textContent).toBe("● OCR · 健康");
+    expect(get("start-scan").disabled).toBe(false);
+  });
+  it("旧页面返回已判定 30、缺少历史时，不再显示误导性的 0 条", async () => {
+    const stats = { ...createEmptyStats(), discovered: 30, decided: 30 };
+    const { get, reload, sendMessage } = await mount({ type: "SCAN_STATS", state: "scanning", stats });
+    expect(get("stat-decided").textContent).toBe("30");
+    expect(get("history-count").textContent).toBe("未读取");
+    expect(get("history-empty").textContent).toContain("未返回当前版本");
+    expect(get("start-scan").textContent).toBe("刷新页面");
+    get("start-scan").listeners.get("click")?.();
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledWith(1));
+    expect(sendMessage.mock.calls.every((call) => call[1].type === "GET_SCAN_STATS")).toBe(true);
+  });
+
+  it("新版页面的 30 条完整记录经消息序列化后生成 30 个卡片", async () => {
+    const history = createScanHistoryStore(() => 100);
+    for (let index = 0; index < 30; index += 1) {
+      const id = String(index);
+      history.begin(id, `帖子 ${index}`, null);
+      history.recordOcr(id, {
+        status: "success", model: "PP-OCRv6 Small", coverUrl: "https://test.xhscdn.com/cover",
+        text: "封面文字", lines: [{ text: "封面文字", score: 0.99 }], elapsedMs: 300,
+        detectedBoxes: 1, recognizedCount: 1,
+      });
+      history.recordJev(id, {
+        input: { model: "jev-1.13.0", state: { note_text: "标题\n封面文字" }, questions: {}, source: "title+ocr" },
+        output: { answers: {} }, decision: { status: "keep", source: "title+ocr" }, startedAt: 100, elapsedMs: 500,
+      });
+      history.finish(id, { status: "keep", source: "title+ocr" });
+    }
+    const { get } = await mount(JSON.parse(JSON.stringify({
+      type: "SCAN_STATS", protocolVersion: SCAN_PROTOCOL_VERSION,
+      state: "scanning", stats: { ...createEmptyStats(), decided: 30 }, history: history.snapshot(),
+    })));
+    expect(get("history-count").textContent).toBe("30 条");
+    expect(get("history-list").children).toHaveLength(30);
+    const firstBody = get("history-list").children[0]?.children[1];
+    expect(firstBody?.children).toHaveLength(4); // OCR / JEV 输入 / JEV 输出 / 最终判定
+    expect(get("history-empty").hidden).toBe(true);
+  });
+});

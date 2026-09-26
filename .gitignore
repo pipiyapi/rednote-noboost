@@ -21,6 +21,7 @@ jspm_packages/
 # 构建产物（扩展只需加载 unpacked 目录，产物不入库）
 # ============================================================
 dist/
+extension/vendor/
 build/
 out/
 *.zip

@@ -10,6 +10,7 @@ import type { ReasonCode } from "./reasonCodes";
 
 /** 本次判定实际使用了哪些材料。每次判定都必须记录它，用于评估与问题排查。 */
 export type InputSource =
+  | "ocr"
   | "title"
   | "title+page_text"
   | "title+ocr"
@@ -79,6 +80,58 @@ export type ScanStats = {
 
 /** 扫描器对外状态。 */
 export type ScanState = "unconfigured" | "ready" | "scanning" | "paused" | "error";
+
+/** PP-OCRv6 Small 返回的单行文字。坐标不进入审计面板，避免会话记录过大。 */
+export type OcrLine = {
+  text: string;
+  score: number;
+};
+
+export type OcrAudit =
+  | { status: "pending"; model: "PP-OCRv6 Small"; coverUrl: string | null }
+  | {
+      status: "success";
+      model: "PP-OCRv6 Small";
+      coverUrl: string;
+      text: string;
+      lines: OcrLine[];
+      elapsedMs: number;
+      detectedBoxes: number;
+      recognizedCount: number;
+    }
+  | {
+      status: "unavailable" | "error";
+      model: "PP-OCRv6 Small";
+      coverUrl: string | null;
+      message: string;
+      elapsedMs?: number;
+    };
+
+/** 一次 JEV 调用的可审计副本。密钥和请求头永远不进入此结构。 */
+export type JevCallAudit = {
+  input: {
+    state: { note_text: string };
+    model: string;
+    questions: Record<string, unknown>;
+    source: InputSource;
+  };
+  output: unknown;
+  decision: DecisionStatus;
+  startedAt: number;
+  elapsedMs: number;
+};
+
+/** 当前小红书页面会话里的单篇检测记录；刷新页面后即清空。 */
+export type ScanHistoryRecord = {
+  noteId: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  stage: "ocr" | "jev" | "done" | "cancelled";
+  ocr: OcrAudit;
+  jevCalls: JevCallAudit[];
+  finalDecision?: DecisionStatus;
+};
 
 /** 允许对卡片做模糊处理的三种状态。 */
 export type FilteredStatus = Extract<

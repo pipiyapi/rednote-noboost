@@ -41,7 +41,9 @@ describe("TypeSafe/Jev 请求", () => {
       model: MODEL,
       questions: buildQuestions(),
     });
-    expect(result.status).toBe("keep");
+    expect(result.decision.status).toBe("keep");
+    expect(result.audit.input.state.note_text).toBe("测试标题");
+    expect(result.audit.output).toMatchObject({ model: MODEL });
   });
 
   it("响应缺题或字段越界时 fail open 为 parse error", async () => {
@@ -58,8 +60,7 @@ describe("TypeSafe/Jev 请求", () => {
     );
 
     await expect(classifyNote("测试标题", "title")).resolves.toMatchObject({
-      status: "error",
-      kind: "parse",
+      decision: { status: "error", kind: "parse" },
     });
   });
 });

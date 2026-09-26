@@ -17,6 +17,7 @@ export const FILTER_KIND_LABELS = {
 
 /** 输入来源 → 中文说明，用于让用户知道这次判定依据是什么。 */
 export const SOURCE_LABELS = {
+  ocr: "封面文字",
   title: "仅标题",
   "title+page_text": "标题 + 页面文本",
   "title+ocr": "标题 + 封面文字",

@@ -1,14 +1,14 @@
 // content script 入口：装配各模块、管理页面生命周期、向 popup 提供统计。
 //
 // 这一层的职责只有「接线」，不做判定、不做页面结构假设：
-//   路由闸门 → 发现 → 队列 → 提取 → (worker 判定) → 渲染 → (必要时 OCR 复判)
+//   路由闸门 → 发现 → 队列 → 提取 → PP-OCRv6 Small → worker 判定 → 渲染/审计
 
-import type { DecisionStatus, InputSource, ScanStats } from "../contracts/types";
+import type { DecisionStatus, InputSource, JevCallAudit, ScanStats } from "../contracts/types";
 import type { ContentToWorker, UiToContent, WorkerToContent } from "../contracts/messages";
 import { createCardController, type FilterSwitches } from "./cardController";
 import { extractNoteText } from "./extractor";
 import { createFeedObserver, type DiscoveredNote } from "./feedObserver";
-import { recognizeCoverText } from "./ocr";
+import { getCoverImageUrl, recognizeCoverText } from "./ocr";
 import { isHomeFeed, onRouteChange } from "./routeGate";
 import {
   createManualScanControl,
@@ -17,6 +17,8 @@ import {
   type QueueJob,
 } from "./scanQueue";
 import { createEmptyStats, recordDecision } from "./scanStats";
+import { createScanHistoryStore } from "./scanHistory";
+import { SCAN_PROTOCOL_VERSION } from "../contracts/scanProtocol";
 
 const CLASSIFY_CONCURRENCY = 3;
 
@@ -29,6 +31,7 @@ const controller = createCardController();
 const observer = createFeedObserver(onDiscover);
 const queue = createScanQueue({ process: processNote, concurrency: CLASSIFY_CONCURRENCY });
 const discoveredNotes = createUniqueNoteTracker();
+const history = createScanHistoryStore();
 const scanControl = createManualScanControl({
   setPaused: (paused) => queue.setPaused(paused),
   clearPending: () => queue.clear(),
@@ -82,41 +85,51 @@ async function processNote(job: QueueJob): Promise<void> {
   if (!scanControl.isActive(generation) || !controller.isCurrentElement(noteId, element)) return;
 
   const extracted = extractNoteText(element);
-  if (!extracted) {
-    // 拿不到任何可用材料：保持可见，不送判定（基线 4.5 fail open）。
-    settle(noteId, element, { status: "uncertain", reasons: [], source: "title" });
-    return;
-  }
+  history.begin(noteId, extracted?.title ?? "（未提取到标题）", getCoverImageUrl(element));
 
-  const first = await classify(noteId, extracted.text, extracted.source);
+  // PP-OCRv6 Small 是默认输入源：每篇卡片都先识别封面，再调用一次 JEV。
+  // OCR 在 offscreen document 中串行执行，不占用页面渲染线程。
+  const ocr = await recognizeCoverText(noteId, element);
+  history.recordOcr(noteId, ocr);
   if (
     !scanControl.isActive(generation) ||
     !controller.isCurrentElement(noteId, element)
-  ) return;
-  if (!first || first.status !== "uncertain") {
-    settle(noteId, element, first ?? { status: "error", kind: "unknown", source: extracted.source });
+  ) {
+    history.cancel(noteId);
     return;
   }
 
-  // 两阶段漏斗：只有第一轮不确定，才值得动用昂贵的 OCR。
-  const ocrText = await recognizeCoverText(noteId, element);
-  if (
-    !scanControl.isActive(generation) ||
-    !controller.isCurrentElement(noteId, element)
-  ) return;
-  if (!ocrText) {
-    settle(noteId, element, first);
+  const ocrText = ocr.status === "success" ? ocr.text.trim() : "";
+  const titleText = extracted?.text.trim() ?? "";
+  const combinedText = [titleText, ocrText].filter(Boolean).join("\n\n");
+  const source: InputSource = ocrText
+    ? extracted?.pageText
+      ? "title+page_text+ocr"
+      : titleText
+        ? "title+ocr"
+        : "ocr"
+    : extracted?.source ?? "title";
+
+  if (!combinedText) {
+    const decision: DecisionStatus = { status: "uncertain", reasons: [], source };
+    history.finish(noteId, decision);
+    settle(noteId, element, decision);
     return;
   }
 
-  const source: InputSource = extracted.pageText ? "title+page_text+ocr" : "title+ocr";
-  if (!scanControl.isActive(generation)) return;
-  const second = await classify(noteId, `${extracted.text}\n\n${ocrText}`, source);
+  const classified = await classify(noteId, combinedText, source);
+  // 请求已经真实发生，即使用户此时暂停或卡片被虚拟列表回收，也要保留审计记录。
+  if (classified) history.recordJev(noteId, classified.audit);
   if (
     !scanControl.isActive(generation) ||
     !controller.isCurrentElement(noteId, element)
-  ) return;
-  settle(noteId, element, second ?? first);
+  ) {
+    history.cancel(noteId);
+    return;
+  }
+  const decision = classified?.decision ?? { status: "error", kind: "unknown", source };
+  history.finish(noteId, decision);
+  settle(noteId, element, decision);
 }
 
 function settle(noteId: string, element: HTMLElement, decision: DecisionStatus): void {
@@ -138,10 +151,10 @@ function classify(
   noteId: string,
   text: string,
   source: InputSource,
-): Promise<DecisionStatus | null> {
+): Promise<{ decision: DecisionStatus; audit: JevCallAudit } | null> {
   return sendToWorker({ type: "CLASSIFY_NOTE", noteId, text, source }).then((response) => {
     if (!response || response.type !== "CLASSIFY_RESULT") return null;
-    return response.decision;
+    return { decision: response.decision, audit: response.audit };
   });
 }
 
@@ -198,14 +211,18 @@ chrome.runtime.onMessage.addListener((message: UiToContent, _sender, sendRespons
     scanControl.start();
   } else if (message.type === "PAUSE_SCAN") {
     scanControl.pause();
+  } else if (message.type === "CLEAR_SCAN_HISTORY") {
+    history.clear();
   } else if (message.type !== "GET_SCAN_STATS") {
     return false;
   }
 
   sendResponse({
     type: "SCAN_STATS",
+    protocolVersion: SCAN_PROTOCOL_VERSION,
     stats: { ...stats },
     state: running ? (scanControl.enabled ? "scanning" : "paused") : "ready",
+    history: history.snapshot(),
   });
   return false;
 });

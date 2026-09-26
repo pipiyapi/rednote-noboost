@@ -7,9 +7,19 @@
 // 注意：worker 里返回 true 表示「稍后异步 sendResponse」，这是 MV3 的硬要求，
 // 忘记 return true 会导致响应永远收不到。
 
-import type { DecisionStatus, FailureKind, InputSource, ScanState, ScanStats } from "./types";
+import type {
+  DecisionStatus,
+  FailureKind,
+  InputSource,
+  JevCallAudit,
+  OcrLine,
+  ScanHistoryRecord,
+  ScanState,
+  ScanStats,
+} from "./types";
 
 export type ContentToWorker =
+  | { type: "OCR_HEALTH"; retry?: boolean }
   | { type: "PING" }
   | {
       type: "CLASSIFY_NOTE";
@@ -22,20 +32,55 @@ export type ContentToWorker =
       type: "FETCH_COVER_BYTES";
       noteId: string;
       url: string;
+    }
+  | {
+      /** 使用 offscreen document 中的 PP-OCRv6 Small 识别封面。 */
+      type: "OCR_COVER";
+      noteId: string;
+      url: string;
     };
 
 export type WorkerToContent =
+  | OcrHealthResponse
   | { type: "PONG" }
-  | { type: "CLASSIFY_RESULT"; noteId: string; decision: DecisionStatus }
+  | { type: "CLASSIFY_RESULT"; noteId: string; decision: DecisionStatus; audit: JevCallAudit }
   | { type: "COVER_BYTES"; ok: true; noteId: string; base64: string; mimeType: string }
-  | { type: "COVER_BYTES"; ok: false; noteId: string; kind: FailureKind };
+  | { type: "COVER_BYTES"; ok: false; noteId: string; kind: FailureKind }
+  | {
+      type: "OCR_RESULT";
+      ok: true;
+      noteId: string;
+      text: string;
+      lines: OcrLine[];
+      elapsedMs: number;
+      detectedBoxes: number;
+      recognizedCount: number;
+    }
+  | { type: "OCR_RESULT"; ok: false; noteId: string; message: string; elapsedMs?: number };
+
+/** service worker ⇄ offscreen OCR document。 */
+export type OffscreenOcrRequest = {
+  type: "OFFSCREEN_OCR_RUN";
+  noteId: string;
+  base64: string;
+  mimeType: string;
+};
+
+export type OffscreenOcrResponse = Extract<WorkerToContent, { type: "OCR_RESULT" }>;
+
+export type OcrHealthResponse = {
+  type: "OCR_HEALTH_RESULT";
+  status: "checking" | "healthy" | "unavailable";
+  message: string;
+};
 
 /** popup 查询或控制当前页面的扫描会话。开始/暂停状态不跨页面刷新持久化。 */
 export type UiToContent =
   | { type: "GET_SCAN_STATS" }
   | { type: "START_SCAN" }
-  | { type: "PAUSE_SCAN" };
+  | { type: "PAUSE_SCAN" }
+  | { type: "CLEAR_SCAN_HISTORY" };
 
 export type ContentToUi =
-  | { type: "SCAN_STATS"; stats: ScanStats; state: ScanState }
+  | { type: "SCAN_STATS"; protocolVersion: number; stats: ScanStats; state: ScanState; history: ScanHistoryRecord[] }
   | { type: "SCAN_STATS_UNAVAILABLE"; reason: string };

@@ -1,4 +1,4 @@
-// 构建脚本：把 TypeScript 打包成扩展可加载的两个产物。
+// 构建脚本：把 TypeScript 打包成扩展可加载的 content、worker、UI 与 OCR 产物。
 //
 // 为什么要打包（而不是像参考项目那样手抄一份共享逻辑）：
 //   1. manifest 的 content_scripts 不支持 "type": "module"，content script
@@ -11,7 +11,8 @@
 // 「加载已解压的扩展程序」选择的目录是 extension/，所以改完代码要重新 build。
 
 import { build, context } from "esbuild";
-import { mkdir, rm } from "node:fs/promises";
+import { copyFile, mkdir, rm, readFile } from "node:fs/promises";
+import { makeOpenCvCspSafe } from "./scripts/opencv-csp.mjs";
 
 const OUT_DIR = "extension/dist";
 const watch = process.argv.includes("--watch");
@@ -53,10 +54,39 @@ const configs = [
     outfile: `${OUT_DIR}/popup.js`,
     format: "esm",
   },
+  {
+    ...base,
+    entryPoints: ["extension/src/offscreen/ocr.ts"],
+    outfile: `${OUT_DIR}/offscreen-ocr.js`,
+    format: "esm",
+    alias: { "onnxruntime-web": "onnxruntime-web/wasm" },
+    plugins: [{
+      name: "opencv-mv3-csp",
+      setup(build) {
+        build.onLoad({ filter: /@techstark[\\/]opencv-js[\\/]dist[\\/]opencv\.js$/ }, async ({ path }) => ({
+          contents: makeOpenCvCspSafe(await readFile(path, "utf8")),
+          loader: "js",
+        }));
+      },
+    }],
+    // OpenCV.js 同时携带 Node/browser 分支；浏览器运行时不会进入 Node 分支。
+    external: ["fs", "path"],
+  },
 ];
 
 await rm(OUT_DIR, { recursive: true, force: true });
 await mkdir(OUT_DIR, { recursive: true });
+const ortDir = "extension/vendor/ort";
+await mkdir(ortDir, { recursive: true });
+await copyFile(
+  "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm",
+  `${ortDir}/ort-wasm-simd-threaded.wasm`,
+);
+// ORT 根据 wasmPaths 动态导入此加载器；只有 .wasm 时初始化会直接失败。
+await copyFile(
+  "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs",
+  `${ortDir}/ort-wasm-simd-threaded.mjs`,
+);
 
 if (watch) {
   const contexts = await Promise.all(configs.map((cfg) => context(cfg)));

@@ -16,9 +16,14 @@ async function resolveModuleScript(htmlPath: string): Promise<string> {
 }
 
 describe("extension UI entrypoints", () => {
+  it("本地 OCR 同时包含 ONNX WASM 与配套模块加载器", async () => {
+    await expect(access(path.join(extensionRoot, "vendor/ort/ort-wasm-simd-threaded.wasm"))).resolves.toBeUndefined();
+    await expect(access(path.join(extensionRoot, "vendor/ort/ort-wasm-simd-threaded.mjs"))).resolves.toBeUndefined();
+  });
   it.each([
     ["src/ui/popup.html", "dist/popup.js"],
     ["src/ui/options.html", "dist/options.js"],
+    ["src/offscreen/ocr.html", "dist/offscreen-ocr.js"],
   ])("%s loads the built module %s", async (htmlPath, expectedModule) => {
     const resolvedScript = await resolveModuleScript(htmlPath);
     const expectedScript = path.join(extensionRoot, expectedModule);
@@ -52,5 +57,21 @@ describe("extension UI entrypoints", () => {
     ) as { permissions?: string[] };
 
     expect(manifest.permissions).toContain("scripting");
+  });
+
+  it("popup 提供逐帖审计历史，manifest 允许本地 OCR offscreen 运行", async () => {
+    const popup = await readFile(path.join(extensionRoot, "src/ui/popup.html"), "utf8");
+    const manifest = JSON.parse(
+      await readFile(path.join(extensionRoot, "manifest.json"), "utf8"),
+    ) as { permissions?: string[]; host_permissions?: string[] };
+
+    expect(popup).toContain('id="history-list"');
+    expect(popup).toContain('id="clear-history"');
+    expect(popup).toContain("PP-OCRv6 Small");
+    expect(manifest.permissions).toContain("offscreen");
+    expect(manifest.host_permissions).toContain("https://*.xhscdn.com/*");
+    expect(manifest.host_permissions).toContain(
+      "https://paddle-model-ecology.bj.bcebos.com/*",
+    );
   });
 });

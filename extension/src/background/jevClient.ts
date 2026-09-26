@@ -7,7 +7,7 @@
 //
 // 失败一律返回 error 状态，绝不抛异常给调用方，也绝不把失败当成 keep 或 filter。
 
-import type { DecisionStatus, FailureKind, InputSource } from "../contracts/types";
+import type { DecisionStatus, FailureKind, InputSource, JevCallAudit } from "../contracts/types";
 import { DECISION_RULES_VERSION, decide } from "../shared/decide";
 import {
   MODEL,
@@ -24,17 +24,34 @@ const API_KEY_STORAGE_KEY = "typesafeApiKey";
 /** 版本信息集中暴露，便于排查「这份结果到底是哪个版本产出的」。 */
 export const CLIENT_INFO = { RUBRIC_VERSION, DECISION_RULES_VERSION, MODEL };
 
-export async function classifyNote(text: string, source: InputSource): Promise<DecisionStatus> {
+export type ClassifyNoteResult = { decision: DecisionStatus; audit: JevCallAudit };
+
+export async function classifyNote(text: string, source: InputSource): Promise<ClassifyNoteResult> {
+  const startedAt = Date.now();
+  const questions = buildQuestions();
+  const input: JevCallAudit["input"] = {
+    state: { note_text: text },
+    model: MODEL,
+    questions: questions as Record<string, unknown>,
+    source,
+  };
+  const finish = (decision: DecisionStatus, output: unknown): ClassifyNoteResult => ({
+    decision,
+    audit: { input, output, decision, startedAt, elapsedMs: Date.now() - startedAt },
+  });
+
   const stored = await chrome.storage.local.get(API_KEY_STORAGE_KEY);
   const apiKey: unknown = stored[API_KEY_STORAGE_KEY];
   if (typeof apiKey !== "string" || apiKey.length === 0) {
-    return { status: "error", kind: "not_configured", source };
+    return finish(
+      { status: "error", kind: "not_configured", source },
+      { error: "not_configured" },
+    );
   }
 
-  const questions = buildQuestions();
   if (Object.keys(questions).length === 0) {
     // 骨架阶段问题集尚未标定：宁可整条链路不可用，也不要用未经验证的问题去判定真实内容。
-    return { status: "error", kind: "rubric_unset", source };
+    return finish({ status: "error", kind: "rubric_unset", source }, { error: "rubric_unset" });
   }
 
   const abort = new AbortController();
@@ -57,20 +74,30 @@ export async function classifyNote(text: string, source: InputSource): Promise<D
     if (!response.ok) {
       // 只记录状态码：绝不记录密钥、请求头或帖子正文（基线第 6 节）。
       console.warn(`[rnb] TypeSafe 请求失败，HTTP ${response.status}`);
-      return { status: "error", kind: mapHttpStatus(response.status), source };
+      const decision: DecisionStatus = {
+        status: "error",
+        kind: mapHttpStatus(response.status),
+        source,
+      };
+      return finish(decision, { error: "http_error", status: response.status });
     }
 
-    const answers = readAnswers(await response.json(), questions);
+    const rawOutput: unknown = await response.json();
+    const answers = readAnswers(rawOutput, questions);
     if (!answers) {
       console.warn("[rnb] TypeSafe 响应结构不符合契约");
-      return { status: "error", kind: "parse", source };
+      return finish({ status: "error", kind: "parse", source }, rawOutput);
     }
 
-    return decide(answers, source);
+    return finish(decide(answers, source), rawOutput);
   } catch (err: unknown) {
     const aborted = err instanceof Error && err.name === "AbortError";
     console.warn(`[rnb] TypeSafe 请求异常：${aborted ? "超时" : "网络"}`);
-    return { status: "error", kind: aborted ? "timeout" : "network", source };
+    const kind = aborted ? "timeout" : "network";
+    return finish(
+      { status: "error", kind, source },
+      { error: kind, message: err instanceof Error ? err.message : "unknown" },
+    );
   } finally {
     clearTimeout(timer);
   }

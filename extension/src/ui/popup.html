@@ -2,41 +2,60 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>RedNote NoBoost</title>
     <style>
       :root {
-        --ink: #242220;
-        --muted: #746f6b;
+        --ink: #25211f;
+        --muted: #746d68;
+        --paper: #fffdfa;
         --surface: #ffffff;
-        --surface-soft: #faf7f5;
-        --line: #eadfda;
-        --accent: #d94a2b;
+        --surface-soft: #f8f4f1;
+        --line: #e7ddd7;
+        --line-strong: #d6c7be;
+        --accent: #d9492b;
+        --accent-dark: #a9341e;
         --accent-soft: #f8d8cf;
-        --accent-pressed: #b8371e;
-        --accent-deep: #8f2715;
+        --success: #28735a;
+        --warning: #986517;
+        --error: #b52f2f;
+        --shadow: 0 8px 24px rgb(67 45 35 / 10%);
       }
-      * {
-        box-sizing: border-box;
-      }
+      * { box-sizing: border-box; }
       body {
-        width: 292px;
+        width: 400px;
+        max-width: 100%;
+        min-width: 0;
         margin: 0;
         padding: 16px;
         overflow-x: clip;
         color: var(--ink);
-        background: var(--surface);
-        font: 13px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        background: var(--paper);
+        font: 13px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
           "Microsoft YaHei", sans-serif;
       }
+      button, input { font: inherit; }
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+      }
       h1 {
-        margin: 0 0 4px;
-        font-size: 17px;
+        margin: 0;
+        font-size: 18px;
         line-height: 1.35;
-        letter-spacing: -0.01em;
+        letter-spacing: -0.02em;
+      }
+      .model-mark {
+        color: var(--accent-dark);
+        font-size: 11px;
+        font-weight: 700;
       }
       #status {
-        min-height: 21px;
-        margin: 0 0 12px;
+        height: 22px;
+        margin: 4px 0 12px;
         overflow: hidden;
         color: var(--muted);
         text-overflow: ellipsis;
@@ -46,68 +65,61 @@
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 8px;
-        margin: 0 0 12px;
+        margin-bottom: 12px;
       }
+      .ocr-health { margin: 0 0 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; }
+      .ocr-health-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+      #ocr-health-label { color: var(--warning); font-weight: 650; }
+      #ocr-health-label[data-state="healthy"] { color: var(--success); }
+      #ocr-health-label[data-state="unavailable"] { color: var(--error); }
+      #ocr-health-message { display: block; height: 38px; overflow: auto; overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
+      #ocr-health-retry { min-height: 32px; padding: 4px 8px; font-size: 11px; }
       button {
-        min-height: 40px;
-        padding: 8px 10px;
+        min-height: 44px;
+        padding: 8px 12px;
         border: 1px solid var(--accent);
         border-radius: 9px;
+        color: var(--accent-dark);
         background: var(--surface);
-        color: var(--accent-pressed);
         cursor: pointer;
-        font: inherit;
-        font-weight: 600;
+        font-weight: 650;
+        transition: border-color 150ms ease-out, box-shadow 150ms ease-out,
+          background 150ms ease-out;
       }
-      button.primary {
-        background: var(--accent-pressed);
-        color: #fff;
-      }
+      button.primary { color: #fff; background: var(--accent-dark); }
       button:not(:disabled):hover,
       button:not(:disabled):focus-visible {
-        border-color: var(--accent-pressed);
-        box-shadow: 0 0 0 2px var(--accent-soft);
+        border-color: var(--accent-dark);
+        box-shadow: 0 0 0 3px var(--accent-soft);
         outline: none;
       }
-      button.primary:not(:disabled):hover {
-        background: var(--accent-deep);
-      }
-      button:disabled {
-        cursor: default;
-        opacity: 0.45;
-      }
+      button:disabled { cursor: default; opacity: 0.42; }
       .filters {
         margin: 0 0 12px;
-        padding: 10px 11px;
+        padding: 8px 12px;
         border: 1px solid var(--line);
         border-radius: 10px;
         background: var(--surface-soft);
       }
-      .filters-title {
-        margin: 0 0 5px;
-        color: #625d59;
-        font-size: 12px;
-        font-weight: 600;
-        letter-spacing: 0.04em;
+      .section-label {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
       }
       .filter-row {
         display: flex;
-        min-height: 38px;
+        min-height: 44px;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
         cursor: pointer;
-        font-weight: 600;
+        font-weight: 650;
       }
-      .filter-row + .filter-row {
-        border-top: 1px solid var(--line);
-      }
-      .switch {
-        position: relative;
-        width: 38px;
-        height: 22px;
-        flex: 0 0 auto;
-      }
+      .filter-row + .filter-row { border-top: 1px solid var(--line); }
+      .switch { position: relative; width: 40px; height: 24px; flex: 0 0 auto; }
       .switch input {
         position: absolute;
         width: 1px;
@@ -120,87 +132,182 @@
         position: absolute;
         inset: 0;
         border-radius: 999px;
-        background: #c9c2be;
+        background: #c8bfba;
         transition: background 150ms ease-out;
       }
       .switch-track::after {
         position: absolute;
         top: 3px;
         left: 3px;
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         border-radius: 50%;
         background: #fff;
         box-shadow: 0 1px 3px rgb(57 43 36 / 28%);
         content: "";
         transition: transform 150ms ease-out;
       }
-      .switch input:checked + .switch-track {
-        background: var(--accent);
-      }
-      .switch input:checked + .switch-track::after {
-        transform: translateX(16px);
-      }
-      .switch input:focus-visible + .switch-track {
-        box-shadow: 0 0 0 3px var(--accent-soft);
-      }
+      .switch input:checked + .switch-track { background: var(--accent); }
+      .switch input:checked + .switch-track::after { transform: translateX(16px); }
+      .switch input:focus-visible + .switch-track { box-shadow: 0 0 0 3px var(--accent-soft); }
       .stats {
-        padding: 6px 2px 2px;
-        border-top: 1px solid var(--line);
+        padding: 10px 12px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
       }
-      .stats-title {
-        margin: 0 0 3px;
-        color: var(--muted);
-        font-size: 12px;
-        font-weight: 600;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      td {
-        padding: 2px 0;
-      }
-      td.num {
+      .stats table { width: 100%; border-collapse: collapse; }
+      .stats td { padding: 2px 0; }
+      .num {
+        width: 38px;
         text-align: right;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         font-variant-numeric: tabular-nums;
-      }
-      a {
-        display: inline-block;
-        margin-top: 12px;
-        color: var(--accent-pressed);
-      }
-      .muted {
-        color: var(--muted);
       }
       .breakdown {
         margin-top: 8px;
         padding-top: 8px;
         border-top: 1px dashed var(--line);
       }
-      .breakdown-title {
+      .breakdown table { width: 100%; }
+      .history { margin-top: 16px; }
+      .history-head {
+        display: flex;
+        flex-wrap: wrap;
+        min-width: 0;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      .history-title { display: flex; min-width: 0; align-items: baseline; gap: 7px; }
+      .history-title h2 { margin: 0; font-size: 15px; }
+      #history-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+      .ghost-button {
+        min-height: 36px;
+        padding: 4px 9px;
+        border-color: var(--line-strong);
         color: var(--muted);
+        background: transparent;
         font-size: 12px;
       }
-      .breakdown table {
-        margin-top: 2px;
-      }
-      .breakdown td {
-        padding: 1px 0;
+      .history-empty {
+        margin: 0;
+        padding: 20px 12px;
+        border: 1px dashed var(--line-strong);
+        border-radius: 10px;
         color: var(--muted);
-        font-size: 12px;
+        text-align: center;
+      }
+      .history-list { display: grid; gap: 8px; }
+      .record {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+      .record > summary {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 9px;
+        min-height: 52px;
+        align-items: center;
+        padding: 9px 11px;
+        cursor: pointer;
+        list-style: none;
+      }
+      .record > summary::-webkit-details-marker { display: none; }
+      .record > summary:focus-visible { box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+      .record[open] > summary { border-bottom: 1px solid var(--line); }
+      .record-title { min-width: 0; }
+      .record-title strong,
+      .record-title span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .record-title span { color: var(--muted); font-size: 11px; }
+      .chevron { color: var(--muted); transition: transform 150ms ease-out; }
+      .record[open] .chevron { transform: rotate(90deg); }
+      .badge {
+        display: inline-flex;
+        min-width: 54px;
+        min-height: 26px;
+        align-items: center;
+        justify-content: center;
+        padding: 3px 7px;
+        border-radius: 6px;
+        color: var(--muted);
+        background: var(--surface-soft);
+        font-size: 11px;
+        font-weight: 700;
+      }
+      .badge.keep { color: var(--success); background: #eaf5f0; }
+      .badge.filter { color: var(--accent-dark); background: var(--accent-soft); }
+      .badge.uncertain { color: var(--warning); background: #f8eedb; }
+      .badge.error { color: var(--error); background: #fae7e7; }
+      .record-body { display: grid; gap: 10px; padding: 11px; }
+      .audit-block { min-width: 0; }
+      .audit-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px;
+        margin-bottom: 4px;
+      }
+      .audit-head strong { font-size: 12px; }
+      .audit-meta { color: var(--muted); font-size: 11px; }
+      pre {
+        max-height: 180px;
+        margin: 0;
+        padding: 9px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        color: #3c3734;
+        background: var(--surface-soft);
+        font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .muted { color: var(--muted); }
+      .footer-link {
+        display: inline-block;
+        min-height: 36px;
+        margin-top: 12px;
+        color: var(--accent-dark);
+        line-height: 36px;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { transition-duration: 0.01ms !important; }
       }
     </style>
   </head>
   <body>
-    <h1>RedNote NoBoost</h1>
+    <header class="topbar">
+      <h1>RedNote NoBoost</h1>
+      <span class="model-mark">PP-OCRv6 Small · 本地</span>
+    </header>
     <p id="status">正在读取状态…</p>
+    <section class="ocr-health" aria-label="OCR 健康状态">
+      <div class="ocr-health-row">
+        <span id="ocr-health-label" data-state="checking" role="status">● OCR · 检查中</span>
+        <button id="ocr-health-retry" type="button">重新检查</button>
+      </div>
+      <span id="ocr-health-message">首次使用需要下载模型，健康后才能开始扫描。</span>
+    </section>
+
     <div class="actions">
       <button class="primary" id="start-scan" type="button">开始扫描</button>
       <button id="pause-scan" type="button">暂停扫描</button>
     </div>
+
     <section class="filters" aria-labelledby="filters-title">
-      <h2 class="filters-title" id="filters-title">过滤内容</h2>
+      <h2 class="section-label" id="filters-title">过滤内容</h2>
       <label class="filter-row">
         <span>商业推广垃圾</span>
         <span class="switch">
@@ -216,8 +323,9 @@
         </span>
       </label>
     </section>
-    <div class="stats">
-      <div class="stats-title">扫描结果</div>
+
+    <section class="stats" aria-labelledby="stats-title">
+      <h2 class="section-label" id="stats-title">本次扫描</h2>
       <table>
         <tr><td>已发现</td><td class="num" id="stat-discovered">–</td></tr>
         <tr><td>已判定</td><td class="num" id="stat-decided">–</td></tr>
@@ -228,13 +336,25 @@
         <tr><td>依据不足</td><td class="num" id="stat-uncertain">–</td></tr>
         <tr><td>失败</td><td class="num" id="stat-error">–</td></tr>
       </table>
-    </div>
-    <div class="breakdown" id="error-breakdown" hidden>
-      <div class="breakdown-title">失败原因</div>
-      <table id="error-breakdown-rows"></table>
-    </div>
-    <a href="#" id="options-link">打开设置</a>
+      <div class="breakdown" id="error-breakdown" hidden>
+        <div class="section-label">失败原因</div>
+        <table id="error-breakdown-rows"></table>
+      </div>
+    </section>
 
+    <section class="history" aria-labelledby="history-title">
+      <div class="history-head">
+        <div class="history-title">
+          <h2 id="history-title">检测历史</h2>
+          <span id="history-count">0 条</span>
+        </div>
+        <button class="ghost-button" id="clear-history" type="button">清空已完成</button>
+      </div>
+      <p class="history-empty" id="history-empty">开始扫描后，这里会显示每篇帖子的 OCR 与 JEV 明细。</p>
+      <div class="history-list" id="history-list"></div>
+    </section>
+
+    <a class="footer-link" href="#" id="options-link">打开 API 设置</a>
     <script type="module" src="../../dist/popup.js"></script>
   </body>
 </html>

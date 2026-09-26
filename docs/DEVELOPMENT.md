@@ -23,16 +23,15 @@ npm run watch      # 边改边构建
 4. 打开扩展的「选项」页，粘贴你自己的 TypeSafe/Jev API Key 并保存；
 5. 访问小红书网页版首页并刷新。
 
+首次打开面板进行 OCR 健康检查时会下载 PP-OCRv6 Small 检测与识别模型（约 30 MiB），之后由浏览器缓存。
+等待识别自检通过、显示绿色“健康”后再开始扫描。更新扩展后还需刷新小红书页面。
+扩展最低要求 Chrome 116；OCR 在 offscreen document 中运行，避免阻塞小红书页面。
+
 ## 当前骨架的行为（重要）
 
-这是脚手架，不是可用版本：
-
-- `extension/src/shared/rubric.ts` 的 `buildQuestions()` **故意返回空**，`decide()` **故意恒返回 uncertain**；
-- 因此判定链路会统一得到「依据不足」，**不会模糊任何内容** —— 这是 fail open 的预期状态，不是故障；
-- `feedObserver` 的卡片选择器与 `extractor` 的标题选择器**故意留空**，必须由 `probes/` 的探针在真实页面确认后填入；
-- 接下来的顺序：**探针验证**（`docs/VALIDATION.md`）→ **页面适配与 OCR** → **rubric 与阈值标定**。
-
-所有待办在代码里都标成 `TODO(探针 A)` / `TODO(探针 B)` / `TODO(基线 5)`，可以直接 grep 列出来。
+当前实现已经接通首页卡片发现、PP-OCRv6 Small、本地会话审计、Jev 调用和确定性判定。
+插件面板会显示逐帖 OCR 结果、Jev 输入/原始输出和最终判定。OCR 或 Jev 失败仍保持内容可见；
+下一阶段重点是用真实页面持续验证 CDN 取图、模型首次加载、吞吐量与判定准确率。
 
 ## 目录说明
 
@@ -41,7 +40,8 @@ npm run watch      # 边改边构建
 | `extension/src/contracts/` | **契约层**：类型、消息协议、理由码与中文文案（唯一真源） |
 | `extension/src/shared/` | rubric 与决策规则（唯一真源，扩展与 eval 共用） |
 | `extension/src/content/` | 路由闸门、卡片发现、扫描队列、内容提取、OCR、卡片状态控制器 |
-| `extension/src/background/` | 无状态 service worker：Jev 客户端 + 封面图字节代理 |
+| `extension/src/background/` | service worker：Jev 客户端、封面代理与 offscreen OCR 桥接 |
+| `extension/src/offscreen/` | PP-OCRv6 Small 的不可见本地运行页面 |
 | `extension/src/ui/` | 设置页与状态面板 |
 | `eval/` | 离线评估：脱敏样本 + 运行器 + 历史运行产物 |
 | `probes/` | Phase 0 一次性验证脚本 |
