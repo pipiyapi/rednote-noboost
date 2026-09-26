@@ -21,6 +21,13 @@ function el<T extends HTMLElement>(id: string): T {
 const statusEl = el<HTMLParagraphElement>("status");
 const startButton = el<HTMLButtonElement>("start-scan");
 const pauseButton = el<HTMLButtonElement>("pause-scan");
+const commercialToggle = el<HTMLInputElement>("toggle-commercial");
+const emotionalToggle = el<HTMLInputElement>("toggle-emotional");
+
+const FILTER_KEYS = {
+  commercial: "filterCommercial",
+  emotional: "filterEmotional",
+} as const;
 
 function setText(id: string, value: string): void {
   const node = document.getElementById(id);
@@ -189,6 +196,22 @@ async function pause(): Promise<void> {
 
 startButton.addEventListener("click", () => void start());
 pauseButton.addEventListener("click", () => void pause());
+
+chrome.storage.local.get(
+  [FILTER_KEYS.commercial, FILTER_KEYS.emotional],
+  (res: Record<string, unknown>) => {
+    commercialToggle.checked = res[FILTER_KEYS.commercial] !== false;
+    emotionalToggle.checked = res[FILTER_KEYS.emotional] === true;
+  },
+);
+
+commercialToggle.addEventListener("change", () => {
+  void chrome.storage.local.set({ [FILTER_KEYS.commercial]: commercialToggle.checked });
+});
+
+emotionalToggle.addEventListener("change", () => {
+  void chrome.storage.local.set({ [FILTER_KEYS.emotional]: emotionalToggle.checked });
+});
 
 document.getElementById("options-link")?.addEventListener("click", (event) => {
   event.preventDefault();

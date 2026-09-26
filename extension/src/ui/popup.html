@@ -4,44 +4,155 @@
     <meta charset="utf-8" />
     <title>RedNote NoBoost</title>
     <style>
+      :root {
+        --ink: #242220;
+        --muted: #746f6b;
+        --surface: #ffffff;
+        --surface-soft: #faf7f5;
+        --line: #eadfda;
+        --accent: #d94a2b;
+        --accent-soft: #f8d8cf;
+        --accent-pressed: #b8371e;
+        --accent-deep: #8f2715;
+      }
+      * {
+        box-sizing: border-box;
+      }
       body {
-        width: 260px;
+        width: 292px;
         margin: 0;
-        padding: 12px 14px 14px;
-        color: #222;
+        padding: 16px;
+        overflow-x: clip;
+        color: var(--ink);
+        background: var(--surface);
         font: 13px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
           "Microsoft YaHei", sans-serif;
       }
       h1 {
-        margin: 0 0 8px;
-        font-size: 14px;
+        margin: 0 0 4px;
+        font-size: 17px;
+        line-height: 1.35;
+        letter-spacing: -0.01em;
       }
       #status {
-        margin: 0 0 10px;
-        color: #666;
+        min-height: 21px;
+        margin: 0 0 12px;
+        overflow: hidden;
+        color: var(--muted);
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 8px;
-        margin: 0 0 10px;
+        margin: 0 0 12px;
       }
       button {
-        padding: 7px 10px;
-        border: 1px solid #d4380d;
-        border-radius: 6px;
-        background: #fff;
-        color: #b52b0a;
+        min-height: 40px;
+        padding: 8px 10px;
+        border: 1px solid var(--accent);
+        border-radius: 9px;
+        background: var(--surface);
+        color: var(--accent-pressed);
         cursor: pointer;
         font: inherit;
+        font-weight: 600;
       }
       button.primary {
-        background: #d4380d;
+        background: var(--accent-pressed);
         color: #fff;
+      }
+      button:not(:disabled):hover,
+      button:not(:disabled):focus-visible {
+        border-color: var(--accent-pressed);
+        box-shadow: 0 0 0 2px var(--accent-soft);
+        outline: none;
+      }
+      button.primary:not(:disabled):hover {
+        background: var(--accent-deep);
       }
       button:disabled {
         cursor: default;
         opacity: 0.45;
+      }
+      .filters {
+        margin: 0 0 12px;
+        padding: 10px 11px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-soft);
+      }
+      .filters-title {
+        margin: 0 0 5px;
+        color: #625d59;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+      .filter-row {
+        display: flex;
+        min-height: 38px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .filter-row + .filter-row {
+        border-top: 1px solid var(--line);
+      }
+      .switch {
+        position: relative;
+        width: 38px;
+        height: 22px;
+        flex: 0 0 auto;
+      }
+      .switch input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+      }
+      .switch-track {
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: #c9c2be;
+        transition: background 150ms ease-out;
+      }
+      .switch-track::after {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 1px 3px rgb(57 43 36 / 28%);
+        content: "";
+        transition: transform 150ms ease-out;
+      }
+      .switch input:checked + .switch-track {
+        background: var(--accent);
+      }
+      .switch input:checked + .switch-track::after {
+        transform: translateX(16px);
+      }
+      .switch input:focus-visible + .switch-track {
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+      .stats {
+        padding: 6px 2px 2px;
+        border-top: 1px solid var(--line);
+      }
+      .stats-title {
+        margin: 0 0 3px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
       }
       table {
         width: 100%;
@@ -56,19 +167,19 @@
       }
       a {
         display: inline-block;
-        margin-top: 10px;
-        color: #d4380d;
+        margin-top: 12px;
+        color: var(--accent-pressed);
       }
       .muted {
-        color: #999;
+        color: var(--muted);
       }
       .breakdown {
         margin-top: 8px;
         padding-top: 8px;
-        border-top: 1px dashed #ddd;
+        border-top: 1px dashed var(--line);
       }
       .breakdown-title {
-        color: #999;
+        color: var(--muted);
         font-size: 12px;
       }
       .breakdown table {
@@ -76,7 +187,7 @@
       }
       .breakdown td {
         padding: 1px 0;
-        color: #666;
+        color: var(--muted);
         font-size: 12px;
       }
     </style>
@@ -88,16 +199,36 @@
       <button class="primary" id="start-scan" type="button">开始扫描</button>
       <button id="pause-scan" type="button">暂停扫描</button>
     </div>
-    <table>
-      <tr><td>已发现</td><td class="num" id="stat-discovered">–</td></tr>
-      <tr><td>已判定</td><td class="num" id="stat-decided">–</td></tr>
-      <tr><td>保留</td><td class="num" id="stat-keep">–</td></tr>
-      <tr><td>推广</td><td class="num" id="stat-commercial">–</td></tr>
-      <tr><td>情绪</td><td class="num" id="stat-emotional">–</td></tr>
-      <tr><td>两类同时</td><td class="num" id="stat-both">–</td></tr>
-      <tr><td>依据不足</td><td class="num" id="stat-uncertain">–</td></tr>
-      <tr><td>失败</td><td class="num" id="stat-error">–</td></tr>
-    </table>
+    <section class="filters" aria-labelledby="filters-title">
+      <h2 class="filters-title" id="filters-title">过滤内容</h2>
+      <label class="filter-row">
+        <span>商业推广垃圾</span>
+        <span class="switch">
+          <input id="toggle-commercial" type="checkbox" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+      <label class="filter-row">
+        <span>情绪垃圾</span>
+        <span class="switch">
+          <input id="toggle-emotional" type="checkbox" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </span>
+      </label>
+    </section>
+    <div class="stats">
+      <div class="stats-title">扫描结果</div>
+      <table>
+        <tr><td>已发现</td><td class="num" id="stat-discovered">–</td></tr>
+        <tr><td>已判定</td><td class="num" id="stat-decided">–</td></tr>
+        <tr><td>保留</td><td class="num" id="stat-keep">–</td></tr>
+        <tr><td>推广</td><td class="num" id="stat-commercial">–</td></tr>
+        <tr><td>情绪</td><td class="num" id="stat-emotional">–</td></tr>
+        <tr><td>两类同时</td><td class="num" id="stat-both">–</td></tr>
+        <tr><td>依据不足</td><td class="num" id="stat-uncertain">–</td></tr>
+        <tr><td>失败</td><td class="num" id="stat-error">–</td></tr>
+      </table>
+    </div>
     <div class="breakdown" id="error-breakdown" hidden>
       <div class="breakdown-title">失败原因</div>
       <table id="error-breakdown-rows"></table>

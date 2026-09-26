@@ -36,6 +36,16 @@ describe("extension UI entrypoints", () => {
     expect(options).not.toContain('id="toggle-autoscan"');
   });
 
+  it("两个过滤开关只出现在 popup，不再占用设置页", async () => {
+    const popup = await readFile(path.join(extensionRoot, "src/ui/popup.html"), "utf8");
+    const options = await readFile(path.join(extensionRoot, "src/ui/options.html"), "utf8");
+
+    expect(popup).toContain('id="toggle-commercial"');
+    expect(popup).toContain('id="toggle-emotional"');
+    expect(options).not.toContain('id="toggle-commercial"');
+    expect(options).not.toContain('id="toggle-emotional"');
+  });
+
   it("manifest 允许 popup 在缺少接收方时注入内容脚本", async () => {
     const manifest = JSON.parse(
       await readFile(path.join(extensionRoot, "manifest.json"), "utf8"),
