@@ -12,6 +12,9 @@ import type {
   FailureKind,
   InputSource,
   JevCallAudit,
+  JevState,
+  JevUsage,
+  BodyAudit,
   OcrLine,
   ScanHistoryRecord,
   ScanState,
@@ -19,12 +22,14 @@ import type {
 } from "./types";
 
 export type ContentToWorker =
+  | { type: "GET_JEV_USAGE" }
+  | { type: "GET_NOTE_BODY"; noteId: string }
   | { type: "OCR_HEALTH"; retry?: boolean }
   | { type: "PING" }
   | {
       type: "CLASSIFY_NOTE";
       noteId: string;
-      text: string;
+      state: JevState;
       source: InputSource;
     }
   | {
@@ -41,6 +46,8 @@ export type ContentToWorker =
     };
 
 export type WorkerToContent =
+  | { type: "JEV_USAGE"; usage: JevUsage | null }
+  | { type: "NOTE_BODY"; noteId: string; body: BodyAudit }
   | OcrHealthResponse
   | { type: "PONG" }
   | { type: "CLASSIFY_RESULT"; noteId: string; decision: DecisionStatus; audit: JevCallAudit }

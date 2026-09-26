@@ -78,7 +78,11 @@ export function createCardController(): CardController {
     if (!isFiltered(decision)) return; // 窄化：其后 decision 一定是三种 filter_* 之一
     if (!shouldBlur(decision, switches)) return;
 
-    element.appendChild(buildOverlay(decision, () => {
+    const visibleDecision: FilteredStatus = decision.status === "filter_both"
+      ? { ...decision, status: switches.commercial && switches.emotional ? "filter_both" : switches.commercial ? "filter_commercial" : "filter_emotional",
+          checks: decision.checks?.filter((check) => switches[check.category]) ?? [] }
+      : decision;
+    element.appendChild(buildOverlay(visibleDecision, () => {
       entry.revealedByUser = true;
       removeOverlay(element);
       element.classList.remove("rnb-blurred");
@@ -167,7 +171,7 @@ function removeOverlay(element: HTMLElement): void {
   element.querySelector(":scope > .rnb-overlay")?.remove();
 }
 
-function buildOverlay(decision: FilteredStatus, onReveal: () => void): HTMLElement {
+export function buildOverlay(decision: FilteredStatus, onReveal: () => void): HTMLElement {
   const overlay = document.createElement("div");
   overlay.className = "rnb-overlay";
 
@@ -182,11 +186,37 @@ function buildOverlay(decision: FilteredStatus, onReveal: () => void): HTMLEleme
 
   const reason = document.createElement("div");
   reason.className = "rnb-reason";
-  reason.textContent = formatReasons(decision.reasons);
+  reason.textContent = decision.status === "filter_commercial" ? "疑似商业推广，且有用信息不足"
+    : decision.status === "filter_emotional" ? "疑似情绪宣泄或煽动，且有用信息不足"
+    : "推广与情绪判断均命中，且有用信息不足";
+  const checks = document.createElement("div");
+  checks.className = "rnb-checks";
+  if (decision.checks?.length) {
+    for (const category of ["commercial", "emotional"] as const) {
+      const selected = decision.checks.filter((check) => check.category === category);
+      if (!selected.length) continue;
+      const group = document.createElement("section");
+      group.className = "rnb-check-group";
+      const heading = document.createElement("strong");
+      heading.textContent = `${category === "commercial" ? "推广" : "情绪"}判断 · 以下条件同时满足`;
+      group.appendChild(heading);
+      for (const check of selected) {
+      const row = document.createElement("div");
+      row.className = "rnb-check";
+      const label = document.createElement("span");
+      label.textContent = check.key === "information_value" ? "有独立信息的概率偏低" : check.label;
+      const value = document.createElement("strong");
+      value.textContent = `${(check.probability * 100).toFixed(1)}% · 阈值 ${check.operator === ">=" ? "≥" : "≤"} ${(check.threshold * 100).toFixed(0)}%`;
+      row.append(label, value);
+      group.appendChild(row);
+      }
+      checks.appendChild(group);
+    }
+  } else { checks.textContent = formatReasons(decision.reasons); }
 
   const meta = document.createElement("div");
   meta.className = "rnb-meta";
-  meta.textContent = `依据：${SOURCE_LABELS[decision.source]}`;
+  meta.textContent = `依据：${SOURCE_LABELS[decision.source]}\n百分比为模型判断概率，非事实认定`;
 
   const button = document.createElement("button");
   button.type = "button";
@@ -194,6 +224,6 @@ function buildOverlay(decision: FilteredStatus, onReveal: () => void): HTMLEleme
   button.textContent = "查看原文";
   button.addEventListener("click", onReveal);
 
-  overlay.append(ribbonWrap, reason, meta, button);
+  overlay.append(ribbonWrap, reason, checks, meta, button);
   return overlay;
 }

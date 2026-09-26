@@ -3,7 +3,9 @@
 // 这一层的职责只有「接线」，不做判定、不做页面结构假设：
 //   路由闸门 → 发现 → 队列 → 提取 → PP-OCRv6 Small → worker 判定 → 渲染/审计
 
-import type { DecisionStatus, InputSource, JevCallAudit, ScanStats } from "../contracts/types";
+import type { DecisionStatus, InputSource, JevCallAudit, JevState, ScanStats } from "../contracts/types";
+import { makeJevState, inputSource } from "../shared/jevInput";
+import { createBodyTextProvider } from "./bodyTextProvider";
 import type { ContentToWorker, UiToContent, WorkerToContent } from "../contracts/messages";
 import { createCardController, type FilterSwitches } from "./cardController";
 import { extractNoteText } from "./extractor";
@@ -32,6 +34,7 @@ const observer = createFeedObserver(onDiscover);
 const queue = createScanQueue({ process: processNote, concurrency: CLASSIFY_CONCURRENCY });
 const discoveredNotes = createUniqueNoteTracker();
 const history = createScanHistoryStore();
+const bodies = createBodyTextProvider();
 const scanControl = createManualScanControl({
   setPaused: (paused) => queue.setPaused(paused),
   clearPending: () => queue.clear(),
@@ -81,7 +84,7 @@ function onDiscover(note: DiscoveredNote): void {
 
 async function processNote(job: QueueJob): Promise<void> {
   const { noteId, element } = job;
-  const generation = scanControl.generation;
+  const generation = job.generation;
   if (!scanControl.isActive(generation) || !controller.isCurrentElement(noteId, element)) return;
 
   const extracted = extractNoteText(element);
@@ -89,8 +92,11 @@ async function processNote(job: QueueJob): Promise<void> {
 
   // PP-OCRv6 Small 是默认输入源：每篇卡片都先识别封面，再调用一次 JEV。
   // OCR 在 offscreen document 中串行执行，不占用页面渲染线程。
-  const ocr = await recognizeCoverText(noteId, element);
-  history.recordOcr(noteId, ocr);
+  const active = () => scanControl.isActive(generation) && controller.isCurrentElement(noteId, element);
+  const [ocr, body] = await Promise.all([
+    recognizeCoverText(noteId, element).then((result) => { history.recordOcr(noteId, result); return result; }),
+    bodies.get(noteId, active).then((result) => { history.recordBody(noteId, result); return result; }),
+  ]);
   if (
     !scanControl.isActive(generation) ||
     !controller.isCurrentElement(noteId, element)
@@ -99,25 +105,17 @@ async function processNote(job: QueueJob): Promise<void> {
     return;
   }
 
-  const ocrText = ocr.status === "success" ? ocr.text.trim() : "";
-  const titleText = extracted?.text.trim() ?? "";
-  const combinedText = [titleText, ocrText].filter(Boolean).join("\n\n");
-  const source: InputSource = ocrText
-    ? extracted?.pageText
-      ? "title+page_text+ocr"
-      : titleText
-        ? "title+ocr"
-        : "ocr"
-    : extracted?.source ?? "title";
+  const state = makeJevState(extracted?.title ?? "", body, ocr);
+  const source = inputSource(state);
 
-  if (!combinedText) {
+  if (!Object.values(state.note).some(Boolean)) {
     const decision: DecisionStatus = { status: "uncertain", reasons: [], source };
     history.finish(noteId, decision);
     settle(noteId, element, decision);
     return;
   }
 
-  const classified = await classify(noteId, combinedText, source);
+  const classified = await classify(noteId, state, source);
   // 请求已经真实发生，即使用户此时暂停或卡片被虚拟列表回收，也要保留审计记录。
   if (classified) history.recordJev(noteId, classified.audit);
   if (
@@ -149,10 +147,10 @@ function settle(noteId: string, element: HTMLElement, decision: DecisionStatus):
 
 function classify(
   noteId: string,
-  text: string,
+  state: JevState,
   source: InputSource,
 ): Promise<{ decision: DecisionStatus; audit: JevCallAudit } | null> {
-  return sendToWorker({ type: "CLASSIFY_NOTE", noteId, text, source }).then((response) => {
+  return sendToWorker({ type: "CLASSIFY_NOTE", noteId, state, source }).then((response) => {
     if (!response || response.type !== "CLASSIFY_RESULT") return null;
     return { decision: response.decision, audit: response.audit };
   });
@@ -192,8 +190,8 @@ function readSettings(): void {
 chrome.storage.onChanged.addListener((changes: Record<string, chrome.storage.StorageChange>) => {
   if (changes["filterCommercial"] || changes["filterEmotional"]) {
     switches = {
-      commercial: changes["filterCommercial"]?.newValue !== false,
-      emotional: changes["filterEmotional"]?.newValue === true,
+      commercial: changes["filterCommercial"] ? changes["filterCommercial"].newValue !== false : switches.commercial,
+      emotional: changes["filterEmotional"] ? changes["filterEmotional"].newValue === true : switches.emotional,
     };
     // 开关只影响渲染，不重新调用 API —— 已判定的笔记用已有结果重放即可。
     if (running) controller.reapplyAll(switches);

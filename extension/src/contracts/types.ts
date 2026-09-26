@@ -10,6 +10,8 @@ import type { ReasonCode } from "./reasonCodes";
 
 /** 本次判定实际使用了哪些材料。每次判定都必须记录它，用于评估与问题排查。 */
 export type InputSource =
+  | "page_text"
+  | "page_text+ocr"
   | "ocr"
   | "title"
   | "title+page_text"
@@ -37,10 +39,11 @@ export type NoteStatus =
   // 否则统计面板无法区分「扫描进度」和「依据不足」。
   | { status: "undetermined" }
   | { status: "keep"; source: InputSource }
-  | {
+    | {
       status: "filter_commercial" | "filter_emotional" | "filter_both";
       reasons: ReasonCode[];
       source: InputSource;
+      checks?: DecisionCheck[];
     }
   | { status: "uncertain"; reasons: ReasonCode[]; source: InputSource }
   | { status: "error"; kind: FailureKind; source?: InputSource };
@@ -110,7 +113,7 @@ export type OcrAudit =
 /** 一次 JEV 调用的可审计副本。密钥和请求头永远不进入此结构。 */
 export type JevCallAudit = {
   input: {
-    state: { note_text: string };
+    state: JevState | { note_text: string };
     model: string;
     questions: Record<string, unknown>;
     source: InputSource;
@@ -119,6 +122,61 @@ export type JevCallAudit = {
   decision: DecisionStatus;
   startedAt: number;
   elapsedMs: number;
+  billing?: JevBilling;
+};
+
+export type BodyAudit = {
+  status: "pending" | "success" | "empty" | "unavailable" | "timeout" | "blocked" | "cancelled";
+  text: string;
+  elapsedMs: number;
+  source: "page_cache" | "background_detail" | "none";
+  noteType: "normal" | "video" | null;
+  imageCount: number | null;
+  truncated: boolean;
+  message?: string;
+};
+
+export type JevState = {
+  note: { title: string; body: string; cover_ocr: string };
+  evidence: {
+    body_status: BodyAudit["status"];
+    body_truncated: boolean;
+    title_truncated: boolean;
+    ocr_truncated: boolean;
+    ocr_status: "success" | "empty" | "error";
+    note_type: BodyAudit["noteType"];
+    image_count: number | null;
+    ocr_scope: "cover_only";
+    other_images_read: false;
+    video_transcribed: false;
+  };
+};
+
+export type DecisionCheck = {
+  key: string;
+  label: string;
+  probability: number;
+  operator: ">=" | "<=";
+  threshold: number;
+  category: "commercial" | "emotional";
+};
+
+export type JevBilling = {
+  status: "not_sent" | "unknown" | "estimated";
+  inputTokens?: number;
+  outputTokens?: number;
+  estimatedUsd?: number;
+  rateUsdPerMillion?: number;
+  pricingDate?: string;
+};
+
+/** 本插件从启用费用统计起的累计，不代表账户余额。 */
+export type JevUsage = {
+  since: number;
+  calls: number;
+  pricedCalls: number;
+  inputTokens: number;
+  estimatedUsd: number;
 };
 
 /** 当前小红书页面会话里的单篇检测记录；刷新页面后即清空。 */
@@ -129,6 +187,7 @@ export type ScanHistoryRecord = {
   updatedAt: number;
   stage: "ocr" | "jev" | "done" | "cancelled";
   ocr: OcrAudit;
+  body?: BodyAudit;
   jevCalls: JevCallAudit[];
   finalDecision?: DecisionStatus;
 };

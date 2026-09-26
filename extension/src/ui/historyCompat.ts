@@ -3,6 +3,7 @@
 
 import type {
   DecisionStatus,
+  BodyAudit,
   JevCallAudit,
   OcrAudit,
   ScanHistoryRecord,
@@ -62,6 +63,7 @@ export function normalizeHistory(value: unknown): ScanHistoryRecord[] {
       updatedAt: typeof record.updatedAt === "number" ? record.updatedAt : timestamp + index,
       stage,
       ocr: normalizeOcr(record.ocr),
+      ...(objectValue(record.body) ? { body: record.body as BodyAudit } : {}),
       jevCalls: normalizeJevCalls(record.jevCalls),
       ...(finalDecision ? { finalDecision } : {}),
     } satisfies ScanHistoryRecord];

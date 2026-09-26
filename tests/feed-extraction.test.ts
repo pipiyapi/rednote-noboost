@@ -53,8 +53,9 @@ describe("小红书首页卡片提取", () => {
     });
   });
 
-  it("空标题或占位短文本不送去计费判定", () => {
-    expect(extractNoteText(fakeCard({ title: "  嗯  " }) as HTMLElement)).toBeNull();
+  it("空标题不提供文本，短标题仍保留以允许正文和封面补充", () => {
+    expect(extractNoteText(fakeCard({ title: "  " }) as HTMLElement)).toBeNull();
+    expect(extractNoteText(fakeCard({ title: "  嗯  " }) as HTMLElement)?.title).toBe("嗯");
   });
 });
 

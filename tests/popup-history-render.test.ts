@@ -27,7 +27,7 @@ class TestNode {
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.resetModules(); });
 
-async function mount(response: unknown, healthStatus = "healthy") {
+async function mount(response: unknown, healthStatus = "healthy", usage?: object) {
   const nodes = new Map<string, TestNode>();
   const get = (id: string) => {
     if (!nodes.has(id)) nodes.set(id, new TestNode());
@@ -42,7 +42,7 @@ async function mount(response: unknown, healthStatus = "healthy") {
   });
   vi.stubGlobal("window", { setInterval: vi.fn(), close: vi.fn() });
   vi.stubGlobal("chrome", {
-    runtime: { sendMessage: vi.fn().mockResolvedValue({ type: "OCR_HEALTH_RESULT", status: healthStatus, message: "自检状态" }) },
+    runtime: { sendMessage: vi.fn(async (message) => message.type === "GET_JEV_USAGE" ? { type: "JEV_USAGE", usage } : { type: "OCR_HEALTH_RESULT", status: healthStatus, message: "自检状态" }) },
     tabs: {
       query: vi.fn().mockResolvedValue([{ id: 1, url: "https://www.xiaohongshu.com/explore" }]),
       sendMessage, reload,
@@ -56,6 +56,12 @@ async function mount(response: unknown, healthStatus = "healthy") {
 }
 
 describe("popup 接收扫描响应并实际生成历史节点", () => {
+  it("只有失败/在途调用时显示费用未知，不冒充花费为零", async () => {
+    const { get } = await mount({ type: "SCAN_STATS", protocolVersion: SCAN_PROTOCOL_VERSION, state: "paused", stats: createEmptyStats(), history: [] }, "healthy", { calls: 1, pricedCalls: 0, inputTokens: 0, estimatedUsd: 0, since: 1 });
+    expect(get("usage-calls").textContent).toBe("1 次");
+    expect(get("usage-cost").textContent).toBe("费用未知");
+    expect(get("usage-detail").textContent).toContain("1 次费用未知");
+  });
   it.each(["checking", "unavailable"])("OCR %s 时禁止开始扫描", async (healthStatus) => {
     const { get, sendMessage } = await mount({
       type: "SCAN_STATS", protocolVersion: SCAN_PROTOCOL_VERSION,
@@ -112,7 +118,7 @@ describe("popup 接收扫描响应并实际生成历史节点", () => {
     expect(get("history-count").textContent).toBe("30 条");
     expect(get("history-list").children).toHaveLength(30);
     const firstBody = get("history-list").children[0]?.children[1];
-    expect(firstBody?.children).toHaveLength(4); // OCR / JEV 输入 / JEV 输出 / 最终判定
+    expect(firstBody?.children).toHaveLength(5); // 正文 / OCR / JEV 输入 / JEV 输出 / 最终判定
     expect(get("history-empty").hidden).toBe(true);
   });
 });

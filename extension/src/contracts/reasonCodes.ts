@@ -7,8 +7,7 @@
 //   3. 展示用文案与内部标识分离，避免把 commercial_dm_funnel 这类内部串
 //      直接甩到用户脸上（参考项目踩过这个坑）。
 //
-// 用法：rubric 用一张 choice 问题让模型在枚举里选，decide 只挑码，
-// 展示层用 formatReasons() 翻译成中文。
+// 用法：rubric 返回 Noul 信号，decide 挑码，展示层翻译为中文。
 
 export const REASON_LABELS = {
   // —— 商业推广类 ——
@@ -27,6 +26,7 @@ export const REASON_LABELS = {
 
   // —— 判定安全 ——
   adversarial_instruction_detected: "疑似针对判定系统的指令",
+  insufficient_evidence: "正文或封面材料不完整，暂不自动过滤",
 } as const;
 
 export type ReasonCode = keyof typeof REASON_LABELS;

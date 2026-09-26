@@ -1,8 +1,9 @@
-import type { DecisionStatus, JevCallAudit, OcrAudit, ScanHistoryRecord } from "../contracts/types";
+import type { BodyAudit, DecisionStatus, JevCallAudit, OcrAudit, ScanHistoryRecord } from "../contracts/types";
 
 export type ScanHistoryStore = {
   begin(noteId: string, title: string, coverUrl: string | null): void;
   recordOcr(noteId: string, ocr: OcrAudit): void;
+  recordBody(noteId: string, body: BodyAudit): void;
   recordJev(noteId: string, audit: JevCallAudit): void;
   finish(noteId: string, decision: DecisionStatus): void;
   cancel(noteId: string): void;
@@ -31,13 +32,20 @@ export function createScanHistoryStore(now: () => number = Date.now): ScanHistor
         updatedAt: timestamp,
         stage: "ocr",
         ocr: { status: "pending", model: "PP-OCRv6 Small", coverUrl },
+        body: { status: "pending", text: "", elapsedMs: 0, source: "none", noteType: null, imageCount: null, truncated: false },
         jevCalls: [],
       });
     },
     recordOcr(noteId, ocr): void {
       update(noteId, (record) => {
         record.ocr = ocr;
-        record.stage = "jev";
+        if (record.body?.status !== "pending") record.stage = "jev";
+      });
+    },
+    recordBody(noteId, body): void {
+      update(noteId, (record) => {
+        record.body = body;
+        if (record.ocr.status !== "pending") record.stage = "jev";
       });
     },
     recordJev(noteId, audit): void {

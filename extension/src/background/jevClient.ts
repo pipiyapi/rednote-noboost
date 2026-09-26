@@ -7,7 +7,8 @@
 //
 // 失败一律返回 error 状态，绝不抛异常给调用方，也绝不把失败当成 keep 或 filter。
 
-import type { DecisionStatus, FailureKind, InputSource, JevCallAudit } from "../contracts/types";
+import type { DecisionStatus, FailureKind, InputSource, JevCallAudit, JevState, JevBilling } from "../contracts/types";
+import { billingFromResponse, recordAttempt, recordBilling } from "./jevUsage";
 import { DECISION_RULES_VERSION, decide } from "../shared/decide";
 import {
   MODEL,
@@ -26,18 +27,19 @@ export const CLIENT_INFO = { RUBRIC_VERSION, DECISION_RULES_VERSION, MODEL };
 
 export type ClassifyNoteResult = { decision: DecisionStatus; audit: JevCallAudit };
 
-export async function classifyNote(text: string, source: InputSource): Promise<ClassifyNoteResult> {
+export async function classifyNote(state: JevState, source: InputSource): Promise<ClassifyNoteResult> {
   const startedAt = Date.now();
   const questions = buildQuestions();
   const input: JevCallAudit["input"] = {
-    state: { note_text: text },
+    state,
     model: MODEL,
     questions: questions as Record<string, unknown>,
     source,
   };
+  let billing: JevBilling = { status: "not_sent" };
   const finish = (decision: DecisionStatus, output: unknown): ClassifyNoteResult => ({
     decision,
-    audit: { input, output, decision, startedAt, elapsedMs: Date.now() - startedAt },
+    audit: { input, output, decision, startedAt, elapsedMs: Date.now() - startedAt, billing },
   });
 
   const stored = await chrome.storage.local.get(API_KEY_STORAGE_KEY);
@@ -58,6 +60,9 @@ export async function classifyNote(text: string, source: InputSource): Promise<C
   const timer = setTimeout(() => abort.abort(), TIMEOUT_MS);
 
   try {
+    // Persist the attempt before sending; a lost response must remain cost-unknown, not free.
+    await recordAttempt();
+    billing = { status: "unknown" };
     const response = await fetch(ENDPOINT, {
       method: "POST",
       headers: {
@@ -67,7 +72,7 @@ export async function classifyNote(text: string, source: InputSource): Promise<C
       },
       // state 是数据、不是指令；对「帖子试图给判定系统下指令」的防护，
       // 由 rubric 里的对抗问题 + decide 的守卫负责，不靠这里的措辞。
-      body: JSON.stringify({ state: { note_text: text }, model: MODEL, questions }),
+      body: JSON.stringify({ state, model: MODEL, questions }),
       signal: abort.signal,
     });
 
@@ -83,13 +88,15 @@ export async function classifyNote(text: string, source: InputSource): Promise<C
     }
 
     const rawOutput: unknown = await response.json();
+    billing = billingFromResponse(rawOutput);
+    await recordBilling(billing);
     const answers = readAnswers(rawOutput, questions);
     if (!answers) {
       console.warn("[rnb] TypeSafe 响应结构不符合契约");
       return finish({ status: "error", kind: "parse", source }, rawOutput);
     }
 
-    return finish(decide(answers, source), rawOutput);
+    return finish(decide(answers, source, state), rawOutput);
   } catch (err: unknown) {
     const aborted = err instanceof Error && err.name === "AbortError";
     console.warn(`[rnb] TypeSafe 请求异常：${aborted ? "超时" : "网络"}`);

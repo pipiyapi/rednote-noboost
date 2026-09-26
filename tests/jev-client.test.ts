@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { classifyNote } from "../extension/src/background/jevClient";
 import { MODEL, buildQuestions } from "../extension/src/shared/rubric";
+import { makeJevState } from "../extension/src/shared/jevInput";
+
+const state = makeJevState("测试标题", { status: "empty", text: "", source: "none", elapsedMs: 0, noteType: null, imageCount: null, truncated: false }, { status: "unavailable", model: "PP-OCRv6 Small", coverUrl: null, message: "none" });
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -10,7 +13,7 @@ afterEach(() => {
 describe("TypeSafe/Jev 请求", () => {
   it("按 System One 契约发送 state、固定模型和 questions", async () => {
     vi.stubGlobal("chrome", {
-      storage: { local: { get: vi.fn().mockResolvedValue({ typesafeApiKey: "test-key" }) } },
+      storage: { local: { get: vi.fn().mockResolvedValue({ typesafeApiKey: "test-key" }), set: vi.fn().mockResolvedValue(undefined) } },
     });
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
@@ -29,7 +32,7 @@ describe("TypeSafe/Jev 请求", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await classifyNote("测试标题", "title");
+    const result = await classifyNote(state, "title");
 
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -37,18 +40,20 @@ describe("TypeSafe/Jev 请求", () => {
     expect(init.method).toBe("POST");
     expect(init.headers).toMatchObject({ Authorization: "Bearer test-key" });
     expect(JSON.parse(String(init.body))).toEqual({
-      state: { note_text: "测试标题" },
+      state,
       model: MODEL,
       questions: buildQuestions(),
     });
     expect(result.decision.status).toBe("keep");
-    expect(result.audit.input.state.note_text).toBe("测试标题");
+    expect(result.audit.input.state).toEqual(state);
+    expect(result.audit.billing).toMatchObject({ status: "estimated", inputTokens: 10 });
+    expect(result.audit.billing?.estimatedUsd).toBeCloseTo(0.00000042, 12);
     expect(result.audit.output).toMatchObject({ model: MODEL });
   });
 
   it("响应缺题或字段越界时 fail open 为 parse error", async () => {
     vi.stubGlobal("chrome", {
-      storage: { local: { get: vi.fn().mockResolvedValue({ typesafeApiKey: "test-key" }) } },
+      storage: { local: { get: vi.fn().mockResolvedValue({ typesafeApiKey: "test-key" }), set: vi.fn().mockResolvedValue(undefined) } },
     });
     vi.stubGlobal(
       "fetch",
@@ -59,7 +64,7 @@ describe("TypeSafe/Jev 请求", () => {
       ),
     );
 
-    await expect(classifyNote("测试标题", "title")).resolves.toMatchObject({
+    await expect(classifyNote(state, "title")).resolves.toMatchObject({
       decision: { status: "error", kind: "parse" },
     });
   });

@@ -157,6 +157,13 @@
         background: var(--surface);
       }
       .stats table { width: 100%; border-collapse: collapse; }
+      .usage { margin: 12px 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
+      .usage-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 12px; margin: 8px 0; }
+      .usage-grid span { display: block; color: var(--muted); font-size: 11px; }
+      .usage-grid strong { display: block; font: 600 16px/1.6 ui-monospace, monospace; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+      .usage p { margin: 4px 0 0; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+      .usage details { margin-top: 8px; color: var(--muted); font-size: 11px; }
+      .usage summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; }
       .stats td { padding: 2px 0; }
       .num {
         width: 38px;
@@ -322,6 +329,21 @@
           <span class="switch-track" aria-hidden="true"></span>
         </span>
       </label>
+    </section>
+
+    <section class="usage" aria-labelledby="usage-title">
+      <h2 class="section-label" id="usage-title">JEV 用量 · USD</h2>
+      <div class="usage-grid">
+        <div><span>累计调用</span><strong id="usage-calls">–</strong></div>
+        <div><span>已知用量估算花费</span><strong id="usage-cost">未读取</strong></div>
+      </div>
+      <p id="usage-detail">正在读取用量…</p>
+      <p>本插件累计估算，非账户余额。</p>
+      <details><summary>计费口径与额度说明</summary>
+        <p>估算美元 = 接口返回的输入 tokens × $0.042 ÷ 1,000,000。输出免费；价格核对于 2026-09-26。</p>
+        <p id="usage-since">本插件累计记录，清空历史不清零。</p>
+        <p>仅统计本插件请求，不是账户余额；费用未知的请求未计入金额。实际扣款、优惠及剩余额度以 TypeSafe 账单为准。</p>
+      </details>
     </section>
 
     <section class="stats" aria-labelledby="stats-title">

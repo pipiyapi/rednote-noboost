@@ -38,7 +38,7 @@ describe("当前页面会话检测历史", () => {
       ocr: { status: "success", text: "封面文字" },
       finalDecision: { status: "keep", source: "title+ocr" },
     });
-    expect(record?.jevCalls[0]?.input.state.note_text).toContain("封面文字");
+    expect(record?.jevCalls[0]?.input.state).toMatchObject({ note_text: expect.stringContaining("封面文字") });
     expect(JSON.stringify(record)).not.toContain("apiKey");
     expect(JSON.stringify(record)).not.toContain("Authorization");
   });

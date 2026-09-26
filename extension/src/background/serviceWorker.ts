@@ -8,6 +8,8 @@ import type { ContentToWorker, WorkerToContent } from "../contracts/messages";
 import { fetchCoverBytes } from "./imageProxy";
 import { classifyNote } from "./jevClient";
 import { recognizeCover, getOcrHealth } from "./offscreenOcr";
+import { fetchNoteBody } from "./bodyText";
+import { readUsage } from "./jevUsage";
 
 chrome.runtime.onInstalled.addListener(() => {
   void chrome.storage.local
@@ -31,6 +33,12 @@ chrome.runtime.onMessage.addListener(
     sendResponse: (response: WorkerToContent) => void,
   ) => {
     switch (message?.type) {
+      case "GET_NOTE_BODY":
+        void fetchNoteBody(message.noteId, _sender).then((body) => sendResponse({ type: "NOTE_BODY", noteId: message.noteId, body }));
+        return true;
+      case "GET_JEV_USAGE":
+        void readUsage().then((usage) => sendResponse({ type: "JEV_USAGE", usage }), () => sendResponse({ type: "JEV_USAGE", usage: null }));
+        return true;
       case "OCR_HEALTH":
         void getOcrHealth(message.retry).then(sendResponse);
         return true;
@@ -39,7 +47,7 @@ chrome.runtime.onMessage.addListener(
         return false;
 
       case "CLASSIFY_NOTE":
-        void classifyNote(message.text, message.source).then(({ decision, audit }) => {
+        void classifyNote(message.state, message.source).then(({ decision, audit }) => {
           sendResponse({ type: "CLASSIFY_RESULT", noteId: message.noteId, decision, audit });
         });
         // 异步响应必须 return true 保持消息通道打开，否则响应永远收不到。

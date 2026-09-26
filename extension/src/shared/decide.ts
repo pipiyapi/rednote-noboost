@@ -7,10 +7,11 @@
 //   4. 阈值必须用真实分数分布标定 —— Jev 的 score 返回连续期望分浮点，
 //      按整数设计的阈值会让几乎所有内容落进灰区（参考项目踩过：覆盖率仅 47%）。
 //
-import type { DecisionStatus, InputSource } from "../contracts/types";
+import type { DecisionCheck, DecisionStatus, InputSource, JevState } from "../contracts/types";
 import type { JevAnswers } from "./rubric";
+import { hasIncompleteEvidence } from "./jevInput";
 
-export const DECISION_RULES_VERSION = "v1-title-conservative";
+export const DECISION_RULES_VERSION = "v2-body-cover-conservative";
 
 const THRESHOLDS = {
   adversarial: 0.75,
@@ -31,7 +32,7 @@ function readNoul(answers: JevAnswers, key: string): number | null {
     : null;
 }
 
-export function decide(answers: JevAnswers, source: InputSource): DecisionStatus {
+export function decide(answers: JevAnswers, source: InputSource, state?: JevState): DecisionStatus {
   const adversarial = readNoul(answers, "adversarial_instruction");
   if (adversarial !== null && adversarial >= THRESHOLDS.adversarial) {
     return { status: "uncertain", reasons: ["adversarial_instruction_detected"], source };
@@ -55,8 +56,7 @@ export function decide(answers: JevAnswers, source: InputSource): DecisionStatus
   }
 
   const commercial =
-    (commercialIntent >= THRESHOLDS.commercialIntent ||
-      commercialCallToAction >= THRESHOLDS.commercialCallToAction) &&
+    commercialIntent >= THRESHOLDS.commercialIntent &&
     information <= THRESHOLDS.lowInformation;
   const emotional =
     (pureEmotion >= THRESHOLDS.pureEmotion || polarization >= THRESHOLDS.polarization) &&
@@ -78,9 +78,22 @@ export function decide(answers: JevAnswers, source: InputSource): DecisionStatus
     );
   }
 
-  if (commercial && emotional) return { status: "filter_both", reasons, source };
-  if (commercial) return { status: "filter_commercial", reasons, source };
-  if (emotional) return { status: "filter_emotional", reasons, source };
+  const incomplete = state && hasIncompleteEvidence(state);
+  const checks: DecisionCheck[] = [];
+  if (commercial) checks.push(
+    { key: "commercial_intent", label: "商业转化意图", probability: commercialIntent, operator: ">=", threshold: THRESHOLDS.commercialIntent, category: "commercial" },
+    { key: "information_value", label: "有独立信息价值", probability: information, operator: "<=", threshold: THRESHOLDS.lowInformation, category: "commercial" },
+  );
+  if (emotional) {
+    if (pureEmotion >= THRESHOLDS.pureEmotion) checks.push({ key: "pure_emotional_expression", label: "缺少事实支撑的情绪宣泄", probability: pureEmotion, operator: ">=", threshold: THRESHOLDS.pureEmotion, category: "emotional" });
+    if (polarization >= THRESHOLDS.polarization) checks.push({ key: "polarization_or_anxiety", label: "无依据的对立 / 焦虑煽动", probability: polarization, operator: ">=", threshold: THRESHOLDS.polarization, category: "emotional" });
+    checks.push({ key: "information_value", label: "有独立信息价值", probability: information, operator: "<=", threshold: THRESHOLDS.veryLowInformation, category: "emotional" });
+  }
+  if (!incomplete) {
+    if (commercial && emotional) return { status: "filter_both", reasons, source, checks };
+    if (commercial) return { status: "filter_commercial", reasons, source, checks };
+    if (emotional) return { status: "filter_emotional", reasons, source, checks };
+  }
 
   const negativeSignals = [
     commercialIntent,
@@ -96,5 +109,5 @@ export function decide(answers: JevAnswers, source: InputSource): DecisionStatus
     return { status: "keep", source };
   }
 
-  return { status: "uncertain", reasons: [], source };
+  return { status: "uncertain", reasons: incomplete ? ["insufficient_evidence"] : [], source };
 }

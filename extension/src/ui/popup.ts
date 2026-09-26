@@ -1,6 +1,6 @@
 // Popup：当前页面的扫描控制、统计与逐帖 OCR/JEV 审计记录。
 
-import type { ContentToUi, UiToContent, OcrHealthResponse } from "../contracts/messages";
+import type { ContentToUi, UiToContent, OcrHealthResponse, WorkerToContent } from "../contracts/messages";
 import type {
   FailureKind,
   JevCallAudit,
@@ -12,11 +12,13 @@ import type {
 import { FAILURE_KIND_LABELS } from "../shared/reasons";
 import { normalizeHistory } from "./historyCompat";
 import { hasCurrentScanProtocol } from "../contracts/scanProtocol";
+import { usd } from "../shared/usageDisplay";
+import { formatReasons } from "../shared/reasons";
 
 const STATE_LABELS: Record<ScanState, string> = {
   unconfigured: "未配置 API Key",
   ready: "就绪",
-  scanning: "扫描中 · 本地 OCR 与 JEV 正在处理",
+  scanning: "扫描中 · 正文、封面 OCR 与 JEV 正在处理",
   paused: "已暂停，点击开始后才会继续检测",
   error: "发生错误",
 };
@@ -94,6 +96,26 @@ function setText(id: string, value: string): void {
   if (node) node.textContent = value;
 }
 
+let readingUsage = false;
+async function refreshUsage(): Promise<void> {
+  if (readingUsage) return;
+  readingUsage = true;
+  try {
+    const response = await chrome.runtime.sendMessage({ type: "GET_JEV_USAGE" }) as WorkerToContent;
+    if (response?.type !== "JEV_USAGE" || !response.usage) throw new Error("unavailable");
+    const u = response.usage;
+    setText("usage-calls", `${u.calls} 次`);
+    setText("usage-cost", u.calls > 0 && u.pricedCalls === 0 ? "费用未知" : usd(u.estimatedUsd));
+    const unknown = u.calls - u.pricedCalls;
+    setText("usage-detail", `${u.pricedCalls} 次有用量 · ${u.inputTokens.toLocaleString("zh-CN")} 输入 tokens${unknown > 0 ? ` · ${unknown} 次费用未知 / 处理中` : ""}`);
+    setText("usage-since", `本插件自 ${new Date(u.since).toLocaleDateString("zh-CN")} 起累计，清空历史不清零。`);
+  } catch {
+    setText("usage-calls", "–");
+    setText("usage-cost", "未读取");
+    setText("usage-detail", "费用统计暂不可用，请重新加载扩展。");
+  } finally { readingUsage = false; }
+}
+
 function renderStats(stats: ScanStats): void {
   setText("stat-discovered", String(stats.discovered));
   setText("stat-decided", String(stats.decided));
@@ -144,7 +166,7 @@ function badgeInfo(record: ScanHistoryRecord): { label: string; className: strin
     if (record.stage === "cancelled") {
       return { label: "已取消", className: "uncertain" };
     }
-    return { label: record.stage === "ocr" ? "OCR 中" : "JEV 中", className: "" };
+    return { label: record.stage === "ocr" ? "取材中" : "JEV 中", className: "" };
   }
   const status = record.finalDecision.status;
   if (status === "keep") return { label: DECISION_LABELS[status] ?? status, className: "keep" };
@@ -227,7 +249,14 @@ function createRecord(record: ScanHistoryRecord, open: boolean): HTMLDetailsElem
   const body = document.createElement("div");
   body.className = "record-body";
   const ocr = describeOcr(record.ocr);
-  body.appendChild(auditBlock("OCR 识别结果", ocr.meta, ocr.value));
+  if (record.body) {
+    const b = record.body;
+    const label = { pending: "获取中", success: "已获取", empty: "正文为空", unavailable: "不可用", timeout: "超时", blocked: "已停止补取", cancelled: "已取消" }[b.status];
+    const source = { page_cache: "页面缓存", background_detail: "后台详情", none: "未取得" }[b.source];
+    body.appendChild(auditBlock("正文", `${label} · ${source} · ${b.elapsedMs} ms${b.truncated ? " · 已截断" : ""}`,
+      b.text || b.message || (b.status === "empty" ? "接口返回空正文；未读取后续图片或视频，不代表帖子没有内容。" : b.status === "pending" ? "等待正文获取结果…" : "未取得正文，已降级使用其他可用材料。")));
+  }
+  body.appendChild(auditBlock("OCR 识别结果 · 仅封面", ocr.meta, ocr.value));
 
   const calls = Array.isArray(record.jevCalls)
     ? record.jevCalls.filter((call): call is JevCallAudit => Boolean(call))
@@ -244,6 +273,12 @@ function createRecord(record: ScanHistoryRecord, open: boolean): HTMLDetailsElem
         call.input,
       ),
     );
+    if (call.billing) {
+      const b = call.billing;
+      body.appendChild(auditBlock("本次调用费用", "USD · 非账户账单",
+        b.status === "estimated" ? `${usd(b.estimatedUsd!)}（估算）\n输入 ${b.inputTokens} tokens × $${b.rateUsdPerMillion} / 百万 tokens；输出免费。`
+          : b.status === "not_sent" ? "未发送请求，不计调用次数。" : "请求已发送，但未取得可计费用量；费用未知，不视为免费。"));
+    }
     body.appendChild(
       auditBlock(
         `JEV 输出${calls.length > 1 ? ` ${index + 1}` : ""}`,
@@ -256,12 +291,15 @@ function createRecord(record: ScanHistoryRecord, open: boolean): HTMLDetailsElem
     body.appendChild(
       auditBlock(
         "JEV 输入 / 输出",
-        "旧版本未记录完整明细",
-        "刷新小红书页面后重新扫描，即可查看完整输入与原始输出。",
+        "没有调用记录",
+        "没有可用文字或任务已取消时，不会调用 JEV。旧版本记录也可能缺少明细。",
       ),
     );
   }
   if (record.finalDecision) {
+    if ("reasons" in record.finalDecision && record.finalDecision.reasons.length) {
+      body.appendChild(auditBlock("判断说明", "基于已取得的文字，不是对作者的事实认定", formatReasons(record.finalDecision.reasons)));
+    }
     body.appendChild(auditBlock("最终判定", "确定性规则结果", record.finalDecision));
   }
 
@@ -490,5 +528,7 @@ document.getElementById("options-link")?.addEventListener("click", (event) => {
 
 void refresh();
 void refreshHealth();
+void refreshUsage();
 window.setInterval(() => void refresh(), 1_000);
+window.setInterval(() => void refreshUsage(), 1_000);
 window.setInterval(() => void refreshHealth(), 3_000);
