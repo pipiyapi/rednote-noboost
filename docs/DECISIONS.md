@@ -124,3 +124,25 @@
 并在 popup 中按帖子展示；刷新或关闭标签页后自然清空，不写入长期本地存储。
 **理由：** 调试与建立判定信任需要完整可见的因果链，但长期保存浏览记录超出 V1 隐私边界。
 **安全边界：** 审计结构永不包含 API Key 或 Authorization 请求头。
+
+## ADR-012 「依据不足」必须带归因，且不改变任何判定结果
+
+**状态：** 已采纳
+**决定：**
+1. `decide()` 返回 `uncertain` 时带上归因码：`insufficient_evidence` /
+   `information_band_middle` / `negative_signals_weak` / `keep_blocked_by_negative_signal` /
+   `adversarial_instruction_detected`；
+2. `ScanStats.uncertainByReason` 按归因分桶，面板在「依据不足」下显示明细（与「失败原因」同款）；
+3. 没有归因的判定（旧版本 content script、答案缺失等异常路径）归入 `unattributed`，**不猜测**。
+**背景：** 面板原先只显示一个「依据不足 N」。但不确定的来源处置方向相反：材料没拿到要修采集
+链路（正文补取 / OCR），落在灰区才是阈值问题，对抗守卫命中可能是误判 bug。
+**理由：** 在不改变任何判定结果的前提下，把「不知道该动哪一处」变成「知道该动哪一处」。
+没有这一步，任何阈值调整都是盲改。
+**归因规则：** 材料不完整 → `insufficient_evidence`；`INFO ≥ 0.75` 却未保留 →
+`keep_blocked_by_negative_signal`；`0.35 < INFO < 0.75` → `information_band_middle`（结构性灰区）；
+其余 → `negative_signals_weak`。
+**版本处理：** `DECISION_RULES_VERSION` 从 `v2-body-cover-conservative` 升为
+`v2.1-body-cover-uncertain-reasons`。归因**不参与判定**，过滤 / 保留 / 不确定的结果完全不变，
+因此历史评估报告仍然可比。
+**重新考虑的条件：** 若真实数据显示 `information_band_middle` 占绝大多数，说明问题在阈值结构
+而不是采集链路，届时再考虑改打分制或调整 `lowInformation` / `keepInformation`。

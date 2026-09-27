@@ -79,7 +79,29 @@ export type ScanStats = {
    * 完全不同，看不到原因既无法排查，也判断不出该改代码还是改配置。
    */
   errorsByKind: Record<FailureKind, number>;
+  /**
+   * 「依据不足」按归因分桶。
+   * 同样是可见但没结论，来源不同处置方向相反：材料没拿到要修采集链路，
+   * 灰区卡住才是阈值问题，对抗守卫命中可能是误判 bug。
+   */
+  uncertainByReason: Record<UncertainBucket, number>;
 };
+
+/** 编译期断言：归因码必须都是合法的 ReasonCode，写错会在这里报错而不是静默失效。 */
+type AssertSubset<T extends U, U> = T;
+
+/** 「依据不足」的归因码。 */
+export type UncertainReason = AssertSubset<
+  | "adversarial_instruction_detected"
+  | "insufficient_evidence"
+  | "information_band_middle"
+  | "negative_signals_weak"
+  | "keep_blocked_by_negative_signal",
+  ReasonCode
+>;
+
+/** 统计用的分桶键；`unattributed` 兜住旧版本判定与异常路径（答案缺失）。 */
+export type UncertainBucket = UncertainReason | "unattributed";
 
 /** 扫描器对外状态。 */
 export type ScanState = "unconfigured" | "ready" | "scanning" | "paused" | "error";

@@ -8,8 +8,9 @@ import type {
   ScanHistoryRecord,
   ScanState,
   ScanStats,
+  UncertainBucket,
 } from "../contracts/types";
-import { FAILURE_KIND_LABELS } from "../shared/reasons";
+import { FAILURE_KIND_LABELS, UNCERTAIN_REASON_LABELS } from "../shared/reasons";
 import { normalizeHistory } from "./historyCompat";
 import { hasCurrentScanProtocol } from "../contracts/scanProtocol";
 import { usd } from "../shared/usageDisplay";
@@ -125,7 +126,40 @@ function renderStats(stats: ScanStats): void {
   setText("stat-both", String(stats.filterBoth));
   setText("stat-uncertain", String(stats.uncertain));
   setText("stat-error", String(stats.error));
+  renderUncertainBreakdown(stats);
   renderErrorBreakdown(stats);
+}
+
+/**
+ * 「依据不足」的原因明细。
+ * 只给一个总数无法判断该修采集链路（材料没拿到）还是该调阈值（灰区），
+ * 这两者的处置方向完全相反。
+ */
+function renderUncertainBreakdown(stats: ScanStats): void {
+  const container = document.getElementById("uncertain-breakdown");
+  const rows = document.getElementById("uncertain-breakdown-rows");
+  if (!container || !rows) return;
+
+  // 扩展重载后页面里可能还是旧版 content script（stats 里没有 uncertainByReason），
+  // 因此按可选处理，宁可少显示也不抛错。
+  const byReason = stats.uncertainByReason as Partial<Record<UncertainBucket, number>> | undefined;
+  const buckets = Object.keys(UNCERTAIN_REASON_LABELS) as UncertainBucket[];
+  const entries = buckets
+    .map((bucket) => ({ bucket, count: byReason?.[bucket] ?? 0 }))
+    .filter((entry) => entry.count > 0);
+
+  rows.textContent = "";
+  container.hidden = entries.length === 0;
+  for (const entry of entries) {
+    const label = document.createElement("td");
+    label.textContent = UNCERTAIN_REASON_LABELS[entry.bucket];
+    const count = document.createElement("td");
+    count.className = "num";
+    count.textContent = String(entry.count);
+    const row = document.createElement("tr");
+    row.append(label, count);
+    rows.appendChild(row);
+  }
 }
 
 function renderErrorBreakdown(stats: ScanStats): void {

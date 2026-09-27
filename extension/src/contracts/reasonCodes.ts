@@ -27,6 +27,13 @@ export const REASON_LABELS = {
   // —— 判定安全 ——
   adversarial_instruction_detected: "疑似针对判定系统的指令",
   insufficient_evidence: "正文或封面材料不完整，暂不自动过滤",
+
+  // —— 「依据不足」的归因（只用于统计与诊断，不会渲染到被遮挡的卡片上）——
+  // 这三条不改变任何判定结果，只是把「不确定」拆成可数的原因，
+  // 否则面板只有一个总数，无法区分「材料没拿到」和「阈值卡住了」。
+  information_band_middle: "信息量落在灰区（既非明显有用也非明显无用）",
+  negative_signals_weak: "信息量够低，但广告/情绪信号未达阈值",
+  keep_blocked_by_negative_signal: "信息量已达保留门槛，但有信号未落到纯净门槛",
 } as const;
 
 export type ReasonCode = keyof typeof REASON_LABELS;

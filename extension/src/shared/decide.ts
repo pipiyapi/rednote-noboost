@@ -7,11 +7,11 @@
 //   4. 阈值必须用真实分数分布标定 —— Jev 的 score 返回连续期望分浮点，
 //      按整数设计的阈值会让几乎所有内容落进灰区（参考项目踩过：覆盖率仅 47%）。
 //
-import type { DecisionCheck, DecisionStatus, InputSource, JevState } from "../contracts/types";
+import type { DecisionCheck, DecisionStatus, InputSource, JevState, UncertainReason } from "../contracts/types";
 import type { JevAnswers } from "./rubric";
 import { hasIncompleteEvidence } from "./jevInput";
 
-export const DECISION_RULES_VERSION = "v2-body-cover-conservative";
+export const DECISION_RULES_VERSION = "v2.1-body-cover-uncertain-reasons";
 
 const THRESHOLDS = {
   adversarial: 0.75,
@@ -109,5 +109,22 @@ export function decide(answers: JevAnswers, source: InputSource, state?: JevStat
     return { status: "keep", source };
   }
 
-  return { status: "uncertain", reasons: incomplete ? ["insufficient_evidence"] : [], source };
+  // 走到这里说明既没命中、也没保留。把「为什么不确定」记下来：
+  // 只给一个 uncertain 总数，无法区分「材料没拿到」和「阈值卡住了」，
+  // 而这两者的处置方向完全相反。归因不参与判定，判定结果与之前完全一致。
+  return { status: "uncertain", reasons: [uncertainReason(information, incomplete)], source };
+}
+
+/**
+ * 归因规则（纯诊断，不改变任何一个判定结果）：
+ *   · 材料不完整 → insufficient_evidence（采集链路问题）
+ *   · INFO ≥ 保留门槛却仍没保留 → keep_blocked_by_negative_signal（被负向信号门槛挡住）
+ *   · INFO 落在 (filter 门槛, 保留门槛) 之间 → information_band_middle（结构性灰区）
+ *   · 其余（INFO 已够低）→ negative_signals_weak（负向信号不够强）
+ */
+function uncertainReason(information: number, incomplete: boolean | undefined): UncertainReason {
+  if (incomplete) return "insufficient_evidence";
+  if (information >= THRESHOLDS.keepInformation) return "keep_blocked_by_negative_signal";
+  if (information > THRESHOLDS.lowInformation) return "information_band_middle";
+  return "negative_signals_weak";
 }
