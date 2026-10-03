@@ -55,6 +55,62 @@
   font-size: 12px;
 }
 
+/* 与扩展注入小红书卡片的遮罩保持同一套结构与视觉规则。 */
+.unified-feed .experience-card-filtered {
+  position: relative;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+  border-radius: 8px;
+  transition: outline-color .46s var(--ease);
+}
+.unified-feed .experience-card-filtered.is-mask-visible { outline-color: #d4380d; }
+.unified-feed .rnb-overlay {
+  --rnb-muted: #666;
+  --rnb-line: #d6c7be;
+  box-sizing: border-box;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 64px 12px 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: rgba(245, 245, 245, .92);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #333;
+  text-align: center;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity .5s var(--ease), transform .5s var(--ease), visibility 0s linear .5s;
+}
+.unified-feed .is-mask-visible .rnb-overlay {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition-delay: 0s;
+}
+.unified-feed .rnb-ribbon-wrap { position: absolute; top: 0; left: 0; width: 96px; height: 96px; overflow: hidden; z-index: 3; pointer-events: none; }
+.unified-feed .rnb-banner { position: absolute; top: 20px; left: -34px; width: 150px; padding: 4px 0; transform: rotate(-45deg); background: #d4380d; color: #fff; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-align: center; box-shadow: 0 2px 4px rgba(0, 0, 0, .25); }
+.unified-feed .rnb-reason { margin-top: auto; font-weight: 600; flex-shrink: 0; }
+.unified-feed .rnb-checks { width: 100%; min-width: 0; flex-shrink: 0; overflow-wrap: anywhere; text-align: left; }
+.unified-feed .rnb-check-group { margin: 6px 0; }
+.unified-feed .rnb-check-group > strong { font-size: 11px; color: var(--rnb-muted); }
+.unified-feed .rnb-check { padding: 6px 0; border-bottom: 1px solid var(--rnb-line); font-size: 12px; }
+.unified-feed .rnb-check span, .unified-feed .rnb-check strong { display: block; }
+.unified-feed .rnb-check strong { font-family: ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.unified-feed .rnb-meta { color: #666; font-size: 12px; flex-shrink: 0; }
+.unified-feed .rnb-reveal { margin-bottom: auto; min-height: 44px; flex-shrink: 0; padding: 4px 14px; border: 1px solid #999; border-radius: 999px; background: #fff; color: #333; font-size: 13px; cursor: pointer; }
+.unified-feed .rnb-reveal:hover, .unified-feed .rnb-reveal:focus-visible { background: #f0f0f0; }
+
 .experience-end {
   display: flex;
   align-items: center;
@@ -73,13 +129,18 @@
   font-weight: 700;
 }
 
-@media (max-width: 1000px) {
+@media (max-width: 1200px) {
   .experience-cards.unified-feed { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 600px) {
-  .experience-cards.unified-feed { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .unified-feed .experience-card:nth-child(even) { margin-top: 25px; }
-  .unified-feed .experience-card-copy { min-height: 100px; padding: 11px; }
-  .unified-feed .experience-card-copy h3 { font-size: 12px; }
+  .experience-cards.unified-feed { grid-template-columns: 1fr; gap: 18px; max-width: 430px; margin-inline: auto; }
+  .unified-feed .experience-card:nth-child(even) { margin-top: 0; }
+  .unified-feed .experience-card-copy { min-height: 92px; padding: 14px; }
+  .unified-feed .experience-card-copy h3 { font-size: 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .unified-feed .experience-card-filtered,
+  .unified-feed .rnb-overlay { transition-duration: 0s; transform: none; }
 }

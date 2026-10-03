@@ -6,6 +6,7 @@ export type ScanHistoryStore = {
   recordBody(noteId: string, body: BodyAudit): void;
   recordJev(noteId: string, audit: JevCallAudit): void;
   finish(noteId: string, decision: DecisionStatus): void;
+  reviseDecision(noteId: string, decision: DecisionStatus): void;
   cancel(noteId: string): void;
   snapshot(): ScanHistoryRecord[];
   clear(): void;
@@ -57,6 +58,14 @@ export function createScanHistoryStore(now: () => number = Date.now): ScanHistor
       update(noteId, (record) => {
         record.finalDecision = decision;
         record.stage = "done";
+      });
+    },
+    reviseDecision(noteId, decision): void {
+      update(noteId, (record) => {
+        if (record.stage !== "done") return;
+        record.finalDecision = decision;
+        const last = record.jevCalls.at(-1);
+        if (last) last.decision = decision;
       });
     },
     cancel(noteId): void {

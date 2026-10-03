@@ -15,6 +15,7 @@ import { normalizeHistory } from "./historyCompat";
 import { hasCurrentScanProtocol } from "../contracts/scanProtocol";
 import { usd } from "../shared/usageDisplay";
 import { formatReasons } from "../shared/reasons";
+import { DECISION_THRESHOLD_KEYS, DEFAULT_DECISION_THRESHOLDS, resolveDecisionThresholds } from "../shared/decide";
 
 const STATE_LABELS: Record<ScanState, string> = {
   unconfigured: "未配置 API Key",
@@ -80,6 +81,10 @@ const pauseButton = el<HTMLButtonElement>("pause-scan");
 const clearHistoryButton = el<HTMLButtonElement>("clear-history");
 const commercialToggle = el<HTMLInputElement>("toggle-commercial");
 const emotionalToggle = el<HTMLInputElement>("toggle-emotional");
+const commercialThreshold = el<HTMLInputElement>("threshold-commercial");
+const emotionalThreshold = el<HTMLInputElement>("threshold-emotional");
+const commercialThresholdValue = el<HTMLOutputElement>("threshold-commercial-value");
+const emotionalThresholdValue = el<HTMLOutputElement>("threshold-emotional-value");
 const historyList = el<HTMLDivElement>("history-list");
 const historyEmpty = el<HTMLParagraphElement>("history-empty");
 const historyCount = el<HTMLSpanElement>("history-count");
@@ -544,12 +549,28 @@ pauseButton.addEventListener("click", () => void pause());
 clearHistoryButton.addEventListener("click", () => void clearHistory());
 
 chrome.storage.local.get(
-  [FILTER_KEYS.commercial, FILTER_KEYS.emotional],
+  [FILTER_KEYS.commercial, FILTER_KEYS.emotional, DECISION_THRESHOLD_KEYS.commercial, DECISION_THRESHOLD_KEYS.emotional],
   (res: Record<string, unknown>) => {
     commercialToggle.checked = res[FILTER_KEYS.commercial] !== false;
     emotionalToggle.checked = res[FILTER_KEYS.emotional] === true;
+    const values = resolveDecisionThresholds(res);
+    setThresholdUi(commercialThreshold, commercialThresholdValue, values.commercial);
+    setThresholdUi(emotionalThreshold, emotionalThresholdValue, values.emotional);
   },
 );
+function setThresholdUi(input: HTMLInputElement, output: HTMLOutputElement, value: number): void {
+  input.value = value.toFixed(2);
+  output.value = value.toFixed(2);
+}
+setThresholdUi(commercialThreshold, commercialThresholdValue, DEFAULT_DECISION_THRESHOLDS.commercial);
+setThresholdUi(emotionalThreshold, emotionalThresholdValue, DEFAULT_DECISION_THRESHOLDS.emotional);
+for (const [input, output, key] of [
+  [commercialThreshold, commercialThresholdValue, DECISION_THRESHOLD_KEYS.commercial],
+  [emotionalThreshold, emotionalThresholdValue, DECISION_THRESHOLD_KEYS.emotional],
+] as const) {
+  input.addEventListener("input", () => { output.value = Number(input.value).toFixed(2); });
+  input.addEventListener("change", () => { void chrome.storage.local.set({ [key]: Number(input.value) }); });
+}
 commercialToggle.addEventListener("change", () => {
   void chrome.storage.local.set({ [FILTER_KEYS.commercial]: commercialToggle.checked });
 });

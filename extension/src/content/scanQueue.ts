@@ -1,4 +1,4 @@
-// 扫描队列：控制在途请求数量、去重、暂停、丢弃已被回收的卡片。
+// 扫描队列：控制在途请求数量、去重、暂停，并保留已发现帖子的输入快照。
 //
 // 为什么队列必须活在 content script 而不是 service worker：
 //   MV3 的 background service worker 空闲约 30 秒就会被浏览器回收，内存里的
@@ -11,7 +11,8 @@
 
 export type QueueJob = {
   noteId: string;
-  element: HTMLElement;
+  title: string;
+  coverUrl: string | null;
   generation: number;
 };
 
@@ -107,10 +108,6 @@ export function createScanQueue(options: {
       if (!job) continue;
 
       queuedGenerations.delete(job.noteId);
-
-      // 卡片已被虚拟化回收：直接丢弃，不浪费一次 API 调用。
-      // 该笔记若再次进入视口，会被重新发现并按 noteId 重新排队。
-      if (!job.element.isConnected) continue;
 
       inFlightGenerations.set(job.noteId, job.generation);
       void options

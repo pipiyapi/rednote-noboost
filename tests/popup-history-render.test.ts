@@ -95,6 +95,16 @@ describe("popup 接收扫描响应并实际生成历史节点", () => {
     expect(sendMessage.mock.calls.every((call) => call[1].type === "GET_SCAN_STATS")).toBe(true);
   });
 
+  it("旧判定规则页面即使带有历史，也提示刷新而不继续扫描", async () => {
+    const { get, reload } = await mount({
+      type: "SCAN_STATS", protocolVersion: 3, state: "scanning", stats: createEmptyStats(), history: [],
+    });
+    expect(get("start-scan").textContent).toBe("刷新页面");
+    expect(get("history-count").textContent).toBe("未读取");
+    get("start-scan").listeners.get("click")?.();
+    await vi.waitFor(() => expect(reload).toHaveBeenCalledWith(1));
+  });
+
   it("新版页面的 30 条完整记录经消息序列化后生成 30 个卡片", async () => {
     const history = createScanHistoryStore(() => 100);
     for (let index = 0; index < 30; index += 1) {

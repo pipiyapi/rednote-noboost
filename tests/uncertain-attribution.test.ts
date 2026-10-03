@@ -2,7 +2,7 @@
 //
 // 三条硬约束：
 //   · 归因只做诊断，绝不能改变任何一个判定结果；
-//   · 灰区是结构性的：INFO 落在 (0.35, 0.75) 时，无论其他信号多高多低都归因为阈值结构；
+//   · 灰区是结构性的：INFO 落在 (0.50, 0.75) 时，无论其他信号多高多低都归因为阈值结构；
 //   · 没有归因的判定（旧版本、答案缺失）必须落入 unattributed，不能被猜成某一类。
 //
 // 断言一律用 toMatchObject：decide() 返回联合类型，keep 分支没有 reasons 字段，
@@ -21,7 +21,7 @@ function answers(overrides: Record<string, number> = {}): Record<string, { noul:
     commercial_call_to_action: 0.05,
     pure_emotional_expression: 0.1,
     polarization_or_anxiety: 0.05,
-    information_value: 0.5,
+    information_value: 0.55,
     adversarial_instruction: 0.01,
     ...overrides,
   };
@@ -57,7 +57,7 @@ const incompleteState: JevState = {
 describe("依据不足的归因", () => {
   it("信息量落在灰区时，即使广告意图很高也归因为阈值结构问题", () => {
     expect(
-      decide(answers({ commercial_intent: 0.9, information_value: 0.5 }), "title", completeState),
+      decide(answers({ commercial_intent: 0.9, information_value: 0.55 }), "title", completeState),
     ).toMatchObject({ status: "uncertain", reasons: ["information_band_middle"] });
   });
 
@@ -71,7 +71,7 @@ describe("依据不足的归因", () => {
 
     for (const variation of variations) {
       expect(
-        decide(answers({ information_value: 0.5, ...variation }), "title", completeState),
+        decide(answers({ information_value: 0.55, ...variation }), "title", completeState),
       ).toMatchObject({ status: "uncertain", reasons: ["information_band_middle"] });
     }
   });
@@ -107,7 +107,7 @@ describe("依据不足的归因", () => {
   it("归因不改变判定结果：不传 state 与传完整 state 的结论一致", () => {
     const cases = [
       { commercial_intent: 0.96, information_value: 0.1 },
-      { information_value: 0.5 },
+      { information_value: 0.55 },
       { information_value: 0.9, commercial_intent: 0.1, pure_emotional_expression: 0.1 },
     ];
 

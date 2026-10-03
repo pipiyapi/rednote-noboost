@@ -4,6 +4,49 @@ const mainText = document.querySelector('#graphic-main');
 const detail = document.querySelector('#graphic-detail');
 const count = document.querySelector('#step-count');
 const steps = [...document.querySelectorAll('.story-step')];
+
+const maskedCards = [...document.querySelectorAll('.unified-feed .experience-card-filtered')];
+
+function showMask(card) {
+  if (!card.classList.contains('experience-card-filtered') || card.classList.contains('is-mask-visible')) return;
+  const overlay = card.querySelector('.rnb-overlay');
+  if (!overlay) return;
+  overlay.inert = false;
+  overlay.setAttribute('aria-hidden', 'false');
+  card.classList.add('is-mask-visible');
+}
+
+maskedCards.forEach((card) => {
+  const overlay = card.querySelector('.rnb-overlay');
+  if (overlay) {
+    overlay.inert = true;
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+});
+
+if ('IntersectionObserver' in window) {
+  const maskObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const card = entry.target.closest('.experience-card-filtered');
+      if (!card) continue;
+      showMask(card);
+      maskObserver.unobserve(entry.target);
+    }
+  }, { rootMargin: '-35% 0px -35% 0px', threshold: 0 });
+  maskedCards.forEach((card) => maskObserver.observe(card.querySelector('.experience-cover') ?? card));
+} else {
+  maskedCards.forEach(showMask);
+}
+
+document.querySelectorAll('.unified-feed .rnb-reveal').forEach((button) => {
+  button.addEventListener('click', () => {
+    const card = button.closest('.experience-card-filtered');
+    if (!card) return;
+    card.querySelector('.rnb-overlay')?.remove();
+    card.classList.remove('experience-card-filtered', 'is-mask-visible');
+  });
+});
 const phases = [
   { phase: 'cover', kicker: '封面文字 / OCR', main: '封面上真正写着什么？', detail: '只识别封面，图片留在本地处理。' },
   { phase: 'body', kicker: '标题 + 可用正文', main: '短于 20 字，才补正文。', detail: '标题与封面文字合计不超过 20 字时才尝试补取。' },

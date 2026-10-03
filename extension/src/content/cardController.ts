@@ -31,6 +31,8 @@ export type CardController = {
   /** 异步结果落地前确认：节点仍连接、DOM 身份未变，且仍归这篇笔记所有。 */
   isCurrentElement(noteId: string, element: HTMLElement): boolean;
   apply(noteId: string, element: HTMLElement, decision: DecisionStatus, switches: FilterSwitches): void;
+  /** 仅重算已有模型输出对应的规则结论，不重新调用模型。 */
+  updateDecision(noteId: string, decision: DecisionStatus, switches: FilterSwitches): void;
   getDecision(noteId: string): NoteStatus | undefined;
   /** 开关变化后重放全部已判定卡片（不重新调用 API）。 */
   reapplyAll(switches: FilterSwitches): void;
@@ -120,17 +122,27 @@ export function createCardController(): CardController {
     isCurrentElement,
 
     apply(noteId, element, decision, switches) {
-      // 旧请求晚到时不能重新夺回已经换绑给新笔记的节点。
-      if (!isCurrentElement(noteId, element)) return;
+      // 判定属于 noteId，而不是可能已回收的 DOM 节点；先缓存结论，再仅渲染当前节点。
       const entry = entries.get(noteId) ?? {
         decision,
         revealedByUser: false,
-        element,
+        element: null,
       };
       entry.decision = decision;
-      entry.element = element;
+      if (isCurrentElement(noteId, element)) entry.element = element;
       entries.set(noteId, entry);
-      render(entry, element, switches);
+      if (entry.element && isCurrentElement(noteId, entry.element)) {
+        render(entry, entry.element, switches);
+      }
+    },
+
+    updateDecision(noteId, decision, switches) {
+      const entry = entries.get(noteId);
+      if (!entry) return;
+      entry.decision = decision;
+      if (entry.element && isCurrentElement(noteId, entry.element)) {
+        render(entry, entry.element, switches);
+      }
     },
 
     getDecision(noteId) {

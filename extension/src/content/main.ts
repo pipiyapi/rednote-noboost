@@ -21,12 +21,15 @@ import {
 import { createEmptyStats, recordDecision } from "./scanStats";
 import { createScanHistoryStore } from "./scanHistory";
 import { SCAN_PROTOCOL_VERSION } from "../contracts/scanProtocol";
+import { decide, DECISION_THRESHOLD_KEYS, DEFAULT_DECISION_THRESHOLDS, resolveDecisionThresholds, type DecisionThresholds } from "../shared/decide";
+import type { JevAnswers } from "../shared/rubric";
 
 const CLASSIFY_CONCURRENCY = 1;
 
 let stats: ScanStats = createEmptyStats();
 // 默认值待评估确认：建议 V1 先只开商业推广过滤器（情绪类误判代价最高）。
 let switches: FilterSwitches = { commercial: true, emotional: false };
+let thresholds: DecisionThresholds = { ...DEFAULT_DECISION_THRESHOLDS };
 let running = false;
 let scanWarning: string | null = null;
 
@@ -76,29 +79,29 @@ function onDiscover(note: DiscoveredNote): void {
   if (!scanControl.enabled) return;
 
   if (discoveredNotes.record(note.noteId)) stats.discovered += 1;
+  // 发现时固定标题与封面；即使瀑布流随后回收节点，队列仍有完整输入。
   queue.enqueue({
     noteId: note.noteId,
-    element: note.element,
+    title: extractNoteText(note.element)?.title ?? "",
+    coverUrl: getCoverImageUrl(note.element),
     generation: scanControl.generation,
   });
 }
 
 async function processNote(job: QueueJob): Promise<void> {
-  const { noteId, element } = job;
+  const { noteId, title, coverUrl } = job;
   const generation = job.generation;
-  if (!scanControl.isActive(generation) || !controller.isCurrentElement(noteId, element)) return;
+  if (!scanControl.isActive(generation)) return;
 
-  const extracted = extractNoteText(element);
-  history.begin(noteId, extracted?.title ?? "（未提取到标题）", getCoverImageUrl(element));
+  history.begin(noteId, title || "（未提取到标题）", coverUrl);
 
   // 每篇卡片先识别封面；只有标题 + OCR 不超过 20 字符才补正文，最后调用一次 JEV。
   // OCR 在 offscreen document 中执行，不占用页面渲染线程。
-  const active = () => scanControl.isActive(generation) && controller.isCurrentElement(noteId, element);
-  const ocr = await recognizeCoverText(noteId, element);
+  const active = () => scanControl.isActive(generation);
+  const ocr = await recognizeCoverText(noteId, coverUrl);
   history.recordOcr(noteId, ocr);
   if (!active()) { history.cancel(noteId); return; }
 
-  const title = extracted?.title ?? "";
   const body = needsBodyFallback(title, ocr)
     ? await bodies.get(noteId, active)
     : {
@@ -117,42 +120,38 @@ async function processNote(job: QueueJob): Promise<void> {
     history.cancel(noteId);
     return;
   }
-  if (
-    !scanControl.isActive(generation) ||
-    !controller.isCurrentElement(noteId, element)
-  ) {
+  if (!scanControl.isActive(generation)) {
     history.cancel(noteId);
     return;
   }
 
-  const state = makeJevState(extracted?.title ?? "", body, ocr);
+  const state = makeJevState(title, body, ocr);
   const source = inputSource(state);
 
   if (!Object.values(state.note).some(Boolean)) {
     const decision: DecisionStatus = { status: "uncertain", reasons: [], source };
     history.finish(noteId, decision);
-    settle(noteId, element, decision);
+    settle(noteId, decision);
     return;
   }
 
   const classified = await classify(noteId, state, source);
   // 请求已经真实发生，即使用户此时暂停或卡片被虚拟列表回收，也要保留审计记录。
-  if (classified) history.recordJev(noteId, classified.audit);
-  if (
-    !scanControl.isActive(generation) ||
-    !controller.isCurrentElement(noteId, element)
-  ) {
+  const currentDecision = classified ? redecide(classified.audit) ?? classified.decision : null;
+  if (classified) {
+    classified.audit.decision = currentDecision ?? classified.decision;
+    history.recordJev(noteId, classified.audit);
+  }
+  if (!scanControl.isActive(generation)) {
     history.cancel(noteId);
     return;
   }
-  const decision = classified?.decision ?? { status: "error", kind: "unknown", source };
+  const decision = currentDecision ?? { status: "error", kind: "unknown", source };
   history.finish(noteId, decision);
-  settle(noteId, element, decision);
+  settle(noteId, decision);
 }
 
-function settle(noteId: string, element: HTMLElement, decision: DecisionStatus): void {
-  if (!controller.isCurrentElement(noteId, element)) return;
-
+function settle(noteId: string, decision: DecisionStatus): void {
   // 失败不是结论：原因同时进日志与统计，方便定位，也允许下次扫描重试。
   if (decision.status === "error") {
     console.warn(`[rnb] 判定失败：${decision.kind}（noteId=${noteId}）`);
@@ -160,7 +159,7 @@ function settle(noteId: string, element: HTMLElement, decision: DecisionStatus):
 
   // 重试会覆盖同一篇笔记的旧结论：先把旧的回退，保证「已判定」按笔记计数。
   recordDecision(stats, controller.getDecision(noteId), decision);
-  controller.apply(noteId, element, decision, switches);
+  controller.updateDecision(noteId, decision, switches);
 }
 
 // ---------------------------------------------------------------- 与 worker 通信
@@ -170,10 +169,41 @@ function classify(
   state: JevState,
   source: InputSource,
 ): Promise<{ decision: DecisionStatus; audit: JevCallAudit } | null> {
-  return sendToWorker({ type: "CLASSIFY_NOTE", noteId, state, source }).then((response) => {
+  return sendToWorker({ type: "CLASSIFY_NOTE", noteId, state, source, thresholds: { ...thresholds } }).then((response) => {
     if (!response || response.type !== "CLASSIFY_RESULT") return null;
     return { decision: response.decision, audit: response.audit };
   });
+}
+
+function redecide(audit: JevCallAudit): DecisionStatus | null {
+  const output = audit.output;
+  const state = audit.input.state;
+  if (!output || typeof output !== "object" || !("answers" in output) ||
+      !output.answers || typeof output.answers !== "object" ||
+      !("note" in state) || !("evidence" in state)) return null;
+  const answers = output.answers as Record<string, unknown>;
+  for (const key of ["commercial_intent", "commercial_call_to_action", "pure_emotional_expression", "polarization_or_anxiety", "information_value", "adversarial_instruction"]) {
+    const answer = answers[key];
+    if (!answer || typeof answer !== "object" || !("noul" in answer) ||
+        typeof answer.noul !== "number" || !Number.isFinite(answer.noul) ||
+        answer.noul < 0 || answer.noul > 1) return null;
+  }
+  return decide(answers as JevAnswers, audit.input.source, state, thresholds);
+}
+
+function reclassifyCompleted(): void {
+  for (const record of history.snapshot()) {
+    if (record.stage !== "done" || !record.finalDecision || record.finalDecision.status === "error") continue;
+    const audit = record.jevCalls.at(-1);
+    if (!audit) continue;
+    const next = redecide(audit);
+    if (!next) continue;
+    const previous = controller.getDecision(record.noteId);
+    if (!previous || previous.status === "undetermined") continue;
+    recordDecision(stats, previous, next);
+    controller.updateDecision(record.noteId, next, switches);
+    history.reviseDecision(record.noteId, next);
+  }
 }
 
 /**
@@ -196,12 +226,13 @@ function sendToWorker(message: ContentToWorker): Promise<WorkerToContent | null>
 
 function readSettings(): void {
   chrome.storage.local.get(
-    ["filterCommercial", "filterEmotional"],
+    ["filterCommercial", "filterEmotional", DECISION_THRESHOLD_KEYS.commercial, DECISION_THRESHOLD_KEYS.emotional],
     (res: Record<string, unknown>) => {
       switches = {
         commercial: res["filterCommercial"] !== false,
         emotional: res["filterEmotional"] === true,
       };
+      thresholds = resolveDecisionThresholds(res);
       if (running) controller.reapplyAll(switches);
     },
   );
@@ -215,6 +246,14 @@ chrome.storage.onChanged.addListener((changes: Record<string, chrome.storage.Sto
     };
     // 开关只影响渲染，不重新调用 API —— 已判定的笔记用已有结果重放即可。
     if (running) controller.reapplyAll(switches);
+  }
+  if (changes[DECISION_THRESHOLD_KEYS.commercial] || changes[DECISION_THRESHOLD_KEYS.emotional]) {
+    const values: Record<string, unknown> = {
+      [DECISION_THRESHOLD_KEYS.commercial]: changes[DECISION_THRESHOLD_KEYS.commercial]?.newValue ?? thresholds.commercial,
+      [DECISION_THRESHOLD_KEYS.emotional]: changes[DECISION_THRESHOLD_KEYS.emotional]?.newValue ?? thresholds.emotional,
+    };
+    thresholds = resolveDecisionThresholds(values);
+    reclassifyCompleted();
   }
 });
 

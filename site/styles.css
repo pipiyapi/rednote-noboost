@@ -141,6 +141,15 @@ em { font-style: normal; color: var(--red-deep); }
 .step-number { color: var(--red-deep); font-size: 15px; font-weight: 800; margin-bottom: 26px; font-variant-numeric: tabular-nums; }
 .story-step h3 { font-family: var(--display); font-size: clamp(34px, 3.7vw, 56px); line-height: 1.28; margin-bottom: 20px; }
 .story-step p { max-width: 24em; color: var(--muted); font-size: clamp(16px, 1.3vw, 19px); line-height: 1.9; }
+.decision-method { margin-top: clamp(34px, 5vw, 70px); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.decision-method summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 0; font-size: 15px; font-weight: 750; cursor: pointer; list-style: none; }
+.decision-method summary::-webkit-details-marker { display: none; }
+.decision-method summary::after { content: "+"; color: var(--red-deep); font-size: 24px; font-weight: 400; line-height: 1; }
+.decision-method[open] summary::after { content: "−"; }
+.decision-method-body { padding: 4px 0 26px; }
+.decision-method-body p { max-width: 68em; margin: 0 0 15px; color: var(--muted); font-size: 14px; line-height: 1.8; }
+.decision-method-body p:last-child { margin-bottom: 0; }
+.decision-method-body .decision-equation { width: fit-content; max-width: 100%; padding: 12px 16px; border-left: 3px solid var(--red); background: var(--paper); color: var(--ink); font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
 
 .features { padding: clamp(85px, 9vw, 150px) clamp(20px, 7vw, 110px); background: var(--mint); }
 .features-heading { margin-bottom: clamp(60px, 7vw, 110px); }

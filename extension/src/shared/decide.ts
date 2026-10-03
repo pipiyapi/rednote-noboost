@@ -11,14 +11,27 @@ import type { DecisionCheck, DecisionStatus, InputSource, JevState, UncertainRea
 import type { JevAnswers } from "./rubric";
 import { hasIncompleteEvidence } from "./jevInput";
 
-export const DECISION_RULES_VERSION = "v2.3.1-unseen-page-guard";
+export const DECISION_RULES_VERSION = "v2.5.0-tunable-strictness";
+
+export const DEFAULT_DECISION_THRESHOLDS = { commercial: 0.6, emotional: 0.5 } as const;
+export const DECISION_THRESHOLD_KEYS = { commercial: "commercialThreshold", emotional: "emotionalThreshold" } as const;
+export type DecisionThresholds = { commercial: number; emotional: number };
+
+export function resolveDecisionThresholds(values: Record<string, unknown>): DecisionThresholds {
+  const read = (key: string, fallback: number): number => {
+    const value = values[key];
+    return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 1
+      ? Math.round(value * 100) / 100 : fallback;
+  };
+  return {
+    commercial: read(DECISION_THRESHOLD_KEYS.commercial, DEFAULT_DECISION_THRESHOLDS.commercial),
+    emotional: read(DECISION_THRESHOLD_KEYS.emotional, DEFAULT_DECISION_THRESHOLDS.emotional),
+  };
+}
 
 const THRESHOLDS = {
   adversarial: 0.75,
-  commercialIntent: 0.85,
-  pureEmotion: 0.5,
-  polarization: 0.88,
-  lowInformation: 0.35,
+  lowInformation: 0.5,
   veryLowInformation: 0.3,
   keepInformation: 0.75,
   keepNegativeCeiling: 0.35,
@@ -31,7 +44,11 @@ function readNoul(answers: JevAnswers, key: string): number | null {
     : null;
 }
 
-export function decide(answers: JevAnswers, source: InputSource, state?: JevState): DecisionStatus {
+export function decide(answers: JevAnswers, source: InputSource, state?: JevState, settings: DecisionThresholds = DEFAULT_DECISION_THRESHOLDS): DecisionStatus {
+  const commercialThreshold = settings.commercial;
+  const emotionalThreshold = settings.emotional;
+  // 焦虑/对立信号始终比纯情绪信号要求更强；默认 0.50 → 0.88。
+  const polarizationThreshold = 0.76 + 0.24 * emotionalThreshold;
   const adversarial = readNoul(answers, "adversarial_instruction");
   if (adversarial !== null && adversarial >= THRESHOLDS.adversarial) {
     return { status: "uncertain", reasons: ["adversarial_instruction_detected"], source };
@@ -55,10 +72,10 @@ export function decide(answers: JevAnswers, source: InputSource, state?: JevStat
   }
 
   const commercial =
-    commercialIntent >= THRESHOLDS.commercialIntent &&
+    commercialIntent >= commercialThreshold &&
     information <= THRESHOLDS.lowInformation;
   const emotional =
-    (pureEmotion >= THRESHOLDS.pureEmotion || polarization >= THRESHOLDS.polarization) &&
+    (pureEmotion >= emotionalThreshold || polarization >= polarizationThreshold) &&
     information <= THRESHOLDS.veryLowInformation;
 
   const reasons = [] as Array<
@@ -70,7 +87,7 @@ export function decide(answers: JevAnswers, source: InputSource, state?: JevStat
   if (commercial) reasons.push("commercial_hard_sell");
   if (emotional) {
     reasons.push(
-      polarization >= THRESHOLDS.polarization
+      polarization >= polarizationThreshold
         ? "emotional_anxiety_bait"
         : "emotional_vent_only",
       "emotional_no_information",
@@ -80,12 +97,12 @@ export function decide(answers: JevAnswers, source: InputSource, state?: JevStat
   const incomplete = state && hasIncompleteEvidence(state);
   const checks: DecisionCheck[] = [];
   if (commercial) checks.push(
-    { key: "commercial_intent", label: "商业转化意图", probability: commercialIntent, operator: ">=", threshold: THRESHOLDS.commercialIntent, category: "commercial" },
+    { key: "commercial_intent", label: "商业转化意图", probability: commercialIntent, operator: ">=", threshold: commercialThreshold, category: "commercial" },
     { key: "information_value", label: "有独立信息价值", probability: information, operator: "<=", threshold: THRESHOLDS.lowInformation, category: "commercial" },
   );
   if (emotional) {
-    if (pureEmotion >= THRESHOLDS.pureEmotion) checks.push({ key: "pure_emotional_expression", label: "缺少事实支撑的情绪宣泄", probability: pureEmotion, operator: ">=", threshold: THRESHOLDS.pureEmotion, category: "emotional" });
-    if (polarization >= THRESHOLDS.polarization) checks.push({ key: "polarization_or_anxiety", label: "无依据的对立 / 焦虑煽动", probability: polarization, operator: ">=", threshold: THRESHOLDS.polarization, category: "emotional" });
+    if (pureEmotion >= emotionalThreshold) checks.push({ key: "pure_emotional_expression", label: "缺少事实支撑的情绪宣泄", probability: pureEmotion, operator: ">=", threshold: emotionalThreshold, category: "emotional" });
+    if (polarization >= polarizationThreshold) checks.push({ key: "polarization_or_anxiety", label: "无依据的对立 / 焦虑煽动", probability: polarization, operator: ">=", threshold: polarizationThreshold, category: "emotional" });
     checks.push({ key: "information_value", label: "有独立信息价值", probability: information, operator: "<=", threshold: THRESHOLDS.veryLowInformation, category: "emotional" });
   }
   if (!incomplete) {

@@ -2,40 +2,47 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DiscoveredNote } from "../extension/src/content/feedObserver";
 import type { BodyAudit, OcrAudit } from "../extension/src/contracts/types";
 
-const hooks = vi.hoisted(() => ({ discover: undefined as ((n: DiscoveredNote) => void) | undefined, ocr: vi.fn() }));
+const hooks = vi.hoisted(() => ({
+  discover: undefined as ((n: DiscoveredNote) => void) | undefined,
+  storageChange: undefined as ((changes: Record<string, { newValue: unknown }>) => void) | undefined,
+  decisions: new Map<string, any>(),
+  ocr: vi.fn(),
+}));
 vi.mock("../extension/src/content/feedObserver", () => ({ createFeedObserver: (cb: (n: DiscoveredNote) => void) => {
   hooks.discover = cb; return { start() {}, stop() {} };
 } }));
 vi.mock("../extension/src/content/routeGate", () => ({ isHomeFeed: () => true, onRouteChange() {} }));
 vi.mock("../extension/src/content/ocr", () => ({ getCoverImageUrl: () => "https://test.xhscdn.com/cover", recognizeCoverText: hooks.ocr }));
 vi.mock("../extension/src/content/cardController", () => ({ createCardController: () => ({
-  attach: () => false, markUndetermined() {}, isCurrentElement: () => true,
-  getDecision: () => undefined, apply() {}, reapplyAll() {}, clearAllOverlays() {},
+  attach: () => false, markUndetermined(noteId: string) { hooks.decisions.set(noteId, { status: "undetermined" }); }, isCurrentElement: () => true,
+  getDecision: (noteId: string) => hooks.decisions.get(noteId), apply() {},
+  updateDecision(noteId: string, decision: any) { hooks.decisions.set(noteId, decision); }, reapplyAll() {}, clearAllOverlays() {},
 }) }));
 
-afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); hooks.ocr.mockReset(); });
+afterEach(() => { vi.unstubAllGlobals(); vi.resetModules(); hooks.ocr.mockReset(); hooks.decisions.clear(); hooks.storageChange = undefined; });
 const body: BodyAudit = { status: "success", text: "正文里的具体方法第一步准备材料，第二步处理，第三步记录结果。", elapsedMs: 20, source: "background_detail", noteType: "normal", imageCount: 5, truncated: false };
 const ocr: OcrAudit = { status: "success", model: "PP-OCRv6 Small", coverUrl: "https://test.xhscdn.com/cover", text: "封面文字", lines: [], elapsedMs: 10, recognizedCount: 0, detectedBoxes: 0 };
 
-async function setup(bodyRequest: () => Promise<BodyAudit>, title = "短") {
+async function setup(bodyRequest: () => Promise<BodyAudit>, title = "短", answers?: Record<string, { noul: number }>) {
   let listener: (m: any, sender: any, cb: (r: any) => void) => void;
   const sendMessage = vi.fn((m, cb) => {
     if (m.type === "GET_NOTE_BODY") return bodyRequest().then((body) => ({ type: "NOTE_BODY", noteId: m.noteId, body }));
     if (m.type === "CLASSIFY_NOTE") {
       const decision = { status: "keep", source: m.source };
-      cb({ type: "CLASSIFY_RESULT", decision, audit: { input: { state: m.state, model: "jev-1.13.0", source: m.source, questions: {} }, output: { answers: {} }, decision, elapsedMs: 1, startedAt: 1 } });
+      cb({ type: "CLASSIFY_RESULT", decision, audit: { input: { state: m.state, model: "jev-1.13.0", source: m.source, questions: {} }, output: { answers: answers ?? {} }, decision, elapsedMs: 1, startedAt: 1 } });
     }
   });
   vi.stubGlobal("chrome", { runtime: { sendMessage, onMessage: { addListener: (cb: typeof listener) => { listener = cb; } } }, storage: {
-    local: { get: (_: unknown, cb: (r: object) => void) => cb({}) }, onChanged: { addListener() {} },
+    local: { get: (_: unknown, cb: (r: object) => void) => cb({}) }, onChanged: { addListener: (cb: typeof hooks.storageChange) => { hooks.storageChange = cb; } },
   } });
   await import("../extension/src/content/main");
   const message = (type: string) => { let response: any; listener({ type }, {}, (r) => { response = r; }); return response; };
   message("START_SCAN");
-  hooks.discover?.({ noteId: "111111111111111111111111", element: {
+  const element = {
     isConnected: true, querySelector: () => ({ textContent: title }),
-  } as unknown as HTMLElement });
-  return { sendMessage, message };
+  } as unknown as HTMLElement;
+  hooks.discover?.({ noteId: "111111111111111111111111", element });
+  return { sendMessage, message, element };
 }
 
 describe("单帖正文 + 仅封面 OCR → 一次 Jev → 历史", () => {
@@ -88,5 +95,34 @@ describe("单帖正文 + 仅封面 OCR → 一次 Jev → 历史", () => {
     expect(sendMessage.mock.calls.some(([m]) => m.type === "CLASSIFY_NOTE")).toBe(false);
     message("START_SCAN");
     expect(message("GET_SCAN_STATS").state).toBe("error");
+  });
+
+  it("OCR 在途时卡片被回收，仍用发现时快照完成 Jev 与历史", async () => {
+    let release!: (value: OcrAudit) => void;
+    hooks.ocr.mockImplementation(() => new Promise<OcrAudit>((resolve) => { release = resolve; }));
+    const { sendMessage, message, element } = await setup(async () => body, "原始标题");
+    (element as { isConnected: boolean }).isConnected = false;
+    release(ocr);
+    await vi.waitFor(() => expect(message("GET_SCAN_STATS").history[0]?.stage).toBe("done"));
+    expect(message("GET_SCAN_STATS").stats.decided).toBe(1);
+    expect(sendMessage.mock.calls.find(([m]) => m.type === "CLASSIFY_NOTE")?.[0].state.note.title).toBe("原始标题");
+    expect(hooks.ocr).toHaveBeenCalledWith("111111111111111111111111", "https://test.xhscdn.com/cover");
+  });
+
+  it("调节严格度用旧 JEV 分数重算，不产生第二次调用", async () => {
+    hooks.ocr.mockResolvedValue(ocr);
+    const answers = {
+      commercial_intent: { noul: 0.65 }, commercial_call_to_action: { noul: 0.1 },
+      pure_emotional_expression: { noul: 0.1 }, polarization_or_anxiety: { noul: 0.1 },
+      information_value: { noul: 0.2 }, adversarial_instruction: { noul: 0.01 },
+    };
+    const { sendMessage, message } = await setup(async () => body, "短", answers);
+    await vi.waitFor(() => expect(message("GET_SCAN_STATS").history[0]?.stage).toBe("done"));
+    expect(message("GET_SCAN_STATS").history[0]?.finalDecision.status).toBe("filter_commercial");
+    hooks.storageChange?.({ commercialThreshold: { newValue: 0.7 } });
+    expect(message("GET_SCAN_STATS").history[0]?.finalDecision.status).toBe("uncertain");
+    expect(message("GET_SCAN_STATS").stats.filterCommercial).toBe(0);
+    expect(message("GET_SCAN_STATS").stats.uncertain).toBe(1);
+    expect(sendMessage.mock.calls.filter(([m]) => m.type === "CLASSIFY_NOTE")).toHaveLength(1);
   });
 });

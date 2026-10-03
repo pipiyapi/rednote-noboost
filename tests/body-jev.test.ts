@@ -109,7 +109,7 @@ describe("结构化证据与保守判定", () => {
     expect(needsBodyFallback("短标题", failedOcr)).toBe(true);
     expect(needsBodyFallback("甲".repeat(26), failedOcr)).toBe(false);
   });
-  it("超过 20 字按规则跳过正文时可用标题与封面判断，但 OCR 错误仍不自动过滤", () => {
+  it("超过 20 字按规则跳过正文时只按标题与封面判断，P2 不触发特殊放行", () => {
     const skipped: BodyAudit = { ...body, status: "skipped", text: "", source: "none" };
     const cover = { ...ocr, text: "商品优惠现在领取具体信息都写在这张封面上，请先关注账号再私信领取完整课程" };
     const state = makeJevState("课程介绍", skipped, cover);
@@ -119,11 +119,11 @@ describe("结构化证据与保守判定", () => {
 
     const failedOcr: OcrAudit = { status: "error", model: "PP-OCRv6 Small", coverUrl: null, message: "OCR 失败" };
     expect(hasIncompleteEvidence(makeJevState("这是一条长度超过二十五个字符的测试标题用于验证失败回退", skipped, failedOcr))).toBe(true);
-    expect(hasIncompleteEvidence(makeJevState("标题", skipped, { ...ocr, text: "请看图中未读取的具体资料和详细步骤以及后续截图" }))).toBe(true);
+    expect(hasIncompleteEvidence(makeJevState("标题", skipped, { ...ocr, text: "请看图中未读取的具体资料和详细步骤以及后续截图" }))).toBe(false);
     const unseenPage = makeJevState("谁能告诉我P2是真的吗😭😭😭", skipped, { ...ocr, text: "封面文字已足够长，可以进入模型判断，但问题指向第二张图" });
-    expect(hasIncompleteEvidence(unseenPage)).toBe(true);
-    expect(decide({ ...answers, commercial_intent: { noul: .08 }, pure_emotional_expression: { noul: .66 } }, inputSource(unseenPage), unseenPage).status).toBe("uncertain");
-    expect(hasIncompleteEvidence(makeJevState("第2张才是重点，请大家看一下", skipped, { ...ocr, text: "封面上的内容已有很多文字" }))).toBe(true);
+    expect(hasIncompleteEvidence(unseenPage)).toBe(false);
+    expect(decide({ ...answers, commercial_intent: { noul: .08 }, pure_emotional_expression: { noul: .66 } }, inputSource(unseenPage), unseenPage).status).toBe("filter_emotional");
+    expect(hasIncompleteEvidence(makeJevState("第2张才是重点，请大家看一下", skipped, { ...ocr, text: "封面上的内容已有很多文字" }))).toBe(false);
   });
   it("正文/封面分开、来源准确、缺标题仍能判断", () => {
     const state = makeJevState("", body, ocr);
@@ -148,8 +148,8 @@ describe("结构化证据与保守判定", () => {
   it("蒙版数据保留实际命中概率与阈值，不凭私信一题过滤", () => {
     const state = makeJevState("标题", body, ocr);
     expect(decide(answers, inputSource(state), state)).toMatchObject({ status: "filter_commercial", checks: [
-      { key: "commercial_intent", probability: .97, threshold: .85 },
-      { key: "information_value", probability: .1, threshold: .35 },
+      { key: "commercial_intent", probability: .97, threshold: .6 },
+      { key: "information_value", probability: .1, threshold: .5 },
     ] });
     expect(decide({ ...answers, commercial_intent: { noul: .1 } }, inputSource(state), state).status).toBe("uncertain");
   });

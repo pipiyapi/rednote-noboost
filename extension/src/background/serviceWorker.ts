@@ -47,7 +47,7 @@ chrome.runtime.onMessage.addListener(
         return false;
 
       case "CLASSIFY_NOTE":
-        void classifyNote(message.state, message.source).then(({ decision, audit }) => {
+        void classifyNote(message.state, message.source, message.thresholds).then(({ decision, audit }) => {
           sendResponse({ type: "CLASSIFY_RESULT", noteId: message.noteId, decision, audit });
         });
         // 异步响应必须 return true 保持消息通道打开，否则响应永远收不到。

@@ -28,9 +28,9 @@ export function getCoverImageUrl(card: HTMLElement): string | null {
 
 export async function recognizeCoverText(
   noteId: string,
-  card: HTMLElement,
+  cardOrUrl: HTMLElement | string | null,
 ): Promise<OcrAudit> {
-  const coverUrl = getCoverImageUrl(card);
+  const coverUrl = typeof cardOrUrl === "string" ? cardOrUrl : cardOrUrl ? getCoverImageUrl(cardOrUrl) : null;
   if (!coverUrl) {
     return {
       status: "unavailable",

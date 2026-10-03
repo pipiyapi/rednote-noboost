@@ -20,6 +20,7 @@ import type {
   ScanState,
   ScanStats,
 } from "./types";
+import type { DecisionThresholds } from "../shared/decide";
 
 export type ContentToWorker =
   | { type: "GET_JEV_USAGE" }
@@ -31,6 +32,7 @@ export type ContentToWorker =
       noteId: string;
       state: JevState;
       source: InputSource;
+      thresholds: DecisionThresholds;
     }
   | {
       /** 请求封面图字节：content script 取不到像素（canvas 污染），必须由 worker 代取。 */

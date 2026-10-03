@@ -9,7 +9,7 @@
 
 import type { DecisionStatus, FailureKind, InputSource, JevCallAudit, JevState, JevBilling } from "../contracts/types";
 import { billingFromResponse, recordAttempt, recordBilling } from "./jevUsage";
-import { DECISION_RULES_VERSION, decide } from "../shared/decide";
+import { DECISION_RULES_VERSION, decide, type DecisionThresholds } from "../shared/decide";
 import {
   MODEL,
   RUBRIC_VERSION,
@@ -27,7 +27,7 @@ export const CLIENT_INFO = { RUBRIC_VERSION, DECISION_RULES_VERSION, MODEL };
 
 export type ClassifyNoteResult = { decision: DecisionStatus; audit: JevCallAudit };
 
-export async function classifyNote(state: JevState, source: InputSource): Promise<ClassifyNoteResult> {
+export async function classifyNote(state: JevState, source: InputSource, thresholds?: DecisionThresholds): Promise<ClassifyNoteResult> {
   const startedAt = Date.now();
   const questions = buildQuestions();
   const input: JevCallAudit["input"] = {
@@ -96,7 +96,7 @@ export async function classifyNote(state: JevState, source: InputSource): Promis
       return finish({ status: "error", kind: "parse", source }, rawOutput);
     }
 
-    return finish(decide(answers, source, state), rawOutput);
+    return finish(decide(answers, source, state, thresholds), rawOutput);
   } catch (err: unknown) {
     const aborted = err instanceof Error && err.name === "AbortError";
     console.warn(`[rnb] TypeSafe 请求异常：${aborted ? "超时" : "网络"}`);
