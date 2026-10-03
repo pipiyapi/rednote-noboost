@@ -11,7 +11,7 @@ import type { DecisionCheck, DecisionStatus, InputSource, JevState, UncertainRea
 import type { JevAnswers } from "./rubric";
 import { hasIncompleteEvidence } from "./jevInput";
 
-export const DECISION_RULES_VERSION = "v2.3-emotion-050-body-20";
+export const DECISION_RULES_VERSION = "v2.3.1-unseen-page-guard";
 
 const THRESHOLDS = {
   adversarial: 0.75,

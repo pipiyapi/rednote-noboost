@@ -120,6 +120,10 @@ describe("结构化证据与保守判定", () => {
     const failedOcr: OcrAudit = { status: "error", model: "PP-OCRv6 Small", coverUrl: null, message: "OCR 失败" };
     expect(hasIncompleteEvidence(makeJevState("这是一条长度超过二十五个字符的测试标题用于验证失败回退", skipped, failedOcr))).toBe(true);
     expect(hasIncompleteEvidence(makeJevState("标题", skipped, { ...ocr, text: "请看图中未读取的具体资料和详细步骤以及后续截图" }))).toBe(true);
+    const unseenPage = makeJevState("谁能告诉我P2是真的吗😭😭😭", skipped, { ...ocr, text: "封面文字已足够长，可以进入模型判断，但问题指向第二张图" });
+    expect(hasIncompleteEvidence(unseenPage)).toBe(true);
+    expect(decide({ ...answers, commercial_intent: { noul: .08 }, pure_emotional_expression: { noul: .66 } }, inputSource(unseenPage), unseenPage).status).toBe("uncertain");
+    expect(hasIncompleteEvidence(makeJevState("第2张才是重点，请大家看一下", skipped, { ...ocr, text: "封面上的内容已有很多文字" }))).toBe(true);
   });
   it("正文/封面分开、来源准确、缺标题仍能判断", () => {
     const state = makeJevState("", body, ocr);

@@ -42,7 +42,8 @@ export function inputSource(state: JevState): InputSource {
 export function hasIncompleteEvidence(state: JevState): boolean {
   const e = state.evidence;
   const text = state.note.body.replace(/#[^#\n]*\[话题\]#/g, "").trim();
-  const refersToUnseenMedia = /看图|见图|图中|看视频|视频里|视频中/.test(
+  // 只读取封面："p2 / 第二张" 等明确指向后续图片的文字不能作为完整材料过滤。
+  const refersToUnseenMedia = /看图|见图|图中|看视频|视频里|视频中|\bP(?:[2-9]|[1-9]\d+)\b|第[二三四五六七八九2-9]张|后续图片/iu.test(
     `${state.note.title}\n${state.note.cover_ocr}`,
   );
   const enoughTitleAndCover = e.body_status === "skipped" &&
