@@ -89,5 +89,5 @@ export type UiToContent =
   | { type: "CLEAR_SCAN_HISTORY" };
 
 export type ContentToUi =
-  | { type: "SCAN_STATS"; protocolVersion: number; stats: ScanStats; state: ScanState; history: ScanHistoryRecord[] }
+  | { type: "SCAN_STATS"; protocolVersion: number; stats: ScanStats; state: ScanState; history: ScanHistoryRecord[]; warning?: string }
   | { type: "SCAN_STATS_UNAVAILABLE"; reason: string };

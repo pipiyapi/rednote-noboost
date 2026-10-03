@@ -159,6 +159,29 @@ describe("虚拟列表节点复用", () => {
     ]);
   });
 
+  it("只上报进入视口的卡片，预加载但未看到的卡片不进入扫描", () => {
+    const first = reusableCard("aaaaaaaaaaaaaaaaaaaaaaaa").element;
+    const second = reusableCard("bbbbbbbbbbbbbbbbbbbbbbbb").element;
+    const discovered: string[] = [];
+    let report!: (entries: Array<{ target: Element; isIntersecting: boolean }>) => void;
+    vi.stubGlobal("document", { body: {}, querySelectorAll: () => [first, second] });
+    vi.stubGlobal("MutationObserver", class { observe(): void {} disconnect(): void {} });
+    vi.stubGlobal("IntersectionObserver", class {
+      constructor(callback: typeof report) { report = callback; }
+      observe(): void {}
+      unobserve(): void {}
+      disconnect(): void {}
+    });
+    const observer = createFeedObserver((note) => discovered.push(note.noteId));
+    observer.start();
+    expect(discovered).toEqual([]);
+    report([{ target: first, isIntersecting: true }, { target: second, isIntersecting: false }]);
+    expect(discovered).toEqual(["aaaaaaaaaaaaaaaaaaaaaaaa"]);
+    report([{ target: first, isIntersecting: true }, { target: second, isIntersecting: true }]);
+    expect(discovered).toEqual(["aaaaaaaaaaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbbbbbbbbbb"]);
+    observer.stop();
+  });
+
   it("离开首页清除遮罩时使在途任务的节点绑定失效", async () => {
     const noteId = "444444444444444444444444";
     const card = reusableCard(noteId);

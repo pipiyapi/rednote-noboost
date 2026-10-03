@@ -121,4 +121,26 @@ describe("popup 接收扫描响应并实际生成历史节点", () => {
     expect(firstBody?.children).toHaveLength(5); // 正文 / OCR / JEV 输入 / JEV 输出 / 最终判定
     expect(get("history-empty").hidden).toBe(true);
   });
+  it("正文按长度规则跳过时明确标明未发请求", async () => {
+    const history = createScanHistoryStore(() => 100);
+    history.begin("note-1", "长标题", null);
+    history.recordOcr("note-1", {
+      status: "success", model: "PP-OCRv6 Small", coverUrl: "https://test.xhscdn.com/cover",
+      text: "封面文字", lines: [], elapsedMs: 10, detectedBoxes: 0, recognizedCount: 0,
+    });
+    history.recordBody("note-1", {
+      status: "skipped", text: "", elapsedMs: 0, source: "none", noteType: null,
+      imageCount: null, truncated: false, message: "标题与封面 OCR 合计 21 字符，超过 20，未请求正文。",
+    });
+    history.finish("note-1", { status: "keep", source: "title+ocr" });
+    const { get } = await mount({
+      type: "SCAN_STATS", protocolVersion: SCAN_PROTOCOL_VERSION,
+      state: "paused", stats: createEmptyStats(), history: history.snapshot(),
+    });
+    const collect = (node: TestNode): string => [node.textContent, ...node.children.map(collect)].join(" ");
+    const text = collect(get("history-list"));
+    expect(text).toContain("按长度规则跳过");
+    expect(text).toContain("未发请求");
+    expect(text).toContain("超过 20，未请求正文");
+  });
 });

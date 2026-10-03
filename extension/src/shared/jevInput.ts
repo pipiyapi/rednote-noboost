@@ -1,5 +1,16 @@
 import type { BodyAudit, InputSource, JevState, OcrAudit } from "../contracts/types";
 
+export const BODY_FALLBACK_MAX_CHARS = 20;
+
+/** 按非空白 Unicode 码点计数；空格和 OCR 行分隔符不算识别内容。 */
+export function visibleCharacterCount(...parts: string[]): number {
+  return Array.from(parts.join("").replace(/\s/gu, "")).length;
+}
+
+export function needsBodyFallback(title: string, ocr: OcrAudit): boolean {
+  return visibleCharacterCount(title, ocr.status === "success" ? ocr.text : "") <= BODY_FALLBACK_MAX_CHARS;
+}
+
 export function clipText(text: string, limit: number): { text: string; truncated: boolean } {
   const chars = Array.from(text.trim());
   return { text: chars.slice(0, limit).join(""), truncated: chars.length > limit };
@@ -27,12 +38,19 @@ export function inputSource(state: JevState): InputSource {
   return ocr ? (title ? "title+ocr" : "ocr") : "title";
 }
 
-/** 缺失不能当成低价值证据。首版保守：正文不足、OCR 失败或截断都禁用自动过滤。 */
+/** 缺失不能当成低价值证据。按长度规则跳过正文与正文请求失败是两种不同情况。 */
 export function hasIncompleteEvidence(state: JevState): boolean {
   const e = state.evidence;
   const text = state.note.body.replace(/#[^#\n]*\[话题\]#/g, "").trim();
-  return e.body_status !== "success" || e.body_truncated || e.title_truncated ||
-    e.ocr_truncated || e.ocr_status === "error" ||
-    Array.from(text).length < 24 ||
+  const refersToUnseenMedia = /看图|见图|图中|看视频|视频里|视频中/.test(
+    `${state.note.title}\n${state.note.cover_ocr}`,
+  );
+  const enoughTitleAndCover = e.body_status === "skipped" &&
+    visibleCharacterCount(state.note.title, state.note.cover_ocr) > BODY_FALLBACK_MAX_CHARS &&
+    !refersToUnseenMedia;
+  const incompleteBody = enoughTitleAndCover ? false :
+    e.body_status !== "success" || Array.from(text).length < 24 ||
     (/看图|见图|图中|看视频|视频里|视频中/.test(text) && Array.from(text).length < 120);
+  return incompleteBody || e.body_truncated || e.title_truncated ||
+    e.ocr_truncated || e.ocr_status === "error";
 }

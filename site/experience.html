@@ -3,71 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#F2F6F5" />
-    <title>滚动体验｜RedNote NoBoost</title>
-    <meta name="description" content="用真实的小红书推荐流帖子，体验 RedNote NoBoost 的滚动扫描与可逆遮罩。" />
-    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
-    <link rel="stylesheet" href="styles.css" />
-    <link rel="stylesheet" href="experience.css" />
-    <script src="experience.js" defer></script>
+    <meta http-equiv="refresh" content="0; url=index.html#demo" />
+    <title>RedNote NoBoost｜滚动体验已合并到介绍页</title>
   </head>
-  <body class="experience-page">
-    <a class="skip-link" href="#experience-main">跳到主要内容</a>
-    <header class="experience-header">
-      <a class="brand" href="index.html"><span class="brand-mark" aria-hidden="true"><span></span></span><span>RedNote <strong>NoBoost</strong></span></a>
-      <span class="experience-header-label">滚动体验</span>
-      <a class="experience-back" href="index.html">返回项目介绍 ↗</a>
-    </header>
-    <main id="experience-main">
-      <section class="experience-intro">
-        <div class="experience-intro-copy">
-          <p class="eyebrow"><span class="eyebrow-line"></span> 真实推荐流</p>
-          <h1>现在，<br />往下刷刷看<span>。</span></h1>
-          <p>不用登录，也不用 API Key。真实的小红书帖子随着你滚动逐篇进入视野：看看内容如何被识别、弱化，或者留在原位。</p>
-          <div class="experience-actions"><button class="button button-primary" id="start-experience" type="button">开始体验 <span aria-hidden="true">↘</span></button><button class="experience-reset" id="reset-experience" type="button">重新开始</button></div>
-        </div>
-        <div class="experience-intro-note" role="note"><strong>自己控制节奏</strong><span>开始后向下滚动，点开卡片的记录；遇到遮罩，也可以一键查看原图。</span></div>
-      </section>
-
-      <div class="experience-workspace" id="feed">
-        <section class="experience-feed" aria-labelledby="feed-title">
-          <div class="feed-topline"><div><p class="eyebrow">首页推荐流</p><h2 id="feed-title">继续往下看。</h2></div><span id="feed-state">等待开始</span></div>
-          <div class="experience-cards">
-            <article class="experience-card" data-title="【记忆系统召回分享】" data-ocr="记忆系统召回分享" data-result="保留" data-reason="保持可见。">
-              <div class="experience-cover"><img src="assets/posts/memory.jpg" alt="真实小红书帖子《记忆系统召回分享》的封面" width="445" height="590" fetchpriority="high" /><div class="experience-mask" hidden></div></div><div class="experience-card-copy"><h3>【记忆系统召回分享】</h3><p>チリヌルヲカ</p><button type="button" class="inspect-button" disabled>尚未识别</button></div>
-            </article>
-            <article class="experience-card" data-title="arXiv 全面限投：每人每月仅 2 篇" data-ocr="刚刚；arXiv 全面限投：每人每月仅 2 篇" data-result="保留" data-reason="保持可见。">
-              <div class="experience-cover"><img src="assets/posts/arxiv.jpg" alt="真实小红书帖子《arXiv 全面限投》的封面" width="445" height="590" fetchpriority="high" /><div class="experience-mask" hidden></div></div><div class="experience-card-copy"><h3>arXiv 全面限投：每人每月仅 2 篇</h3><p>科技圈刚刚</p><button type="button" class="inspect-button" disabled>尚未识别</button></div>
-            </article>
-            <article class="experience-card" data-title="罗福莉升职到小米最高职级，真成了打工皇帝" data-ocr="罗福莉升职到小米最高职级，真成了打工皇帝" data-result="弱化" data-reason="可查看原图。">
-              <div class="experience-cover"><img src="assets/posts/xiaomi.jpg" alt="真实小红书帖子《罗福莉升职到小米最高职级》的封面" width="445" height="590" loading="lazy" decoding="async" /><div class="experience-mask" hidden></div></div><div class="experience-card-copy"><h3>罗福莉升职到小米最高职级，真成了打工皇帝</h3><p>大厂电流</p><button type="button" class="inspect-button" disabled>尚未识别</button></div>
-            </article>
-            <article class="experience-card" data-title="世界上最舒服的配色 🎨" data-ocr="世界上最舒服的配色；7 组治愈系双色搭配" data-result="保留" data-reason="保持可见。">
-              <div class="experience-cover"><img src="assets/posts/colors.jpg" alt="真实小红书帖子《世界上最舒服的配色》的封面" width="445" height="590" loading="lazy" decoding="async" /><div class="experience-mask" hidden></div></div><div class="experience-card-copy"><h3>世界上最舒服的配色 🎨</h3><p>像素与玫瑰</p><button type="button" class="inspect-button" disabled>尚未识别</button></div>
-            </article>
-            <article class="experience-card" data-title="DeepSeek V5 这次不用英伟达了" data-ocr="DeepSeek V5；换芯" data-result="保留" data-reason="保持可见。">
-              <div class="experience-cover"><img src="assets/posts/deepseek.jpg" alt="真实小红书帖子《DeepSeek V5 这次不用英伟达了》的封面" width="445" height="590" loading="lazy" decoding="async" /><div class="experience-mask" hidden></div></div><div class="experience-card-copy"><h3>DeepSeek V5 这次不用英伟达了</h3><p>艾欧同学</p><button type="button" class="inspect-button" disabled>尚未识别</button></div>
-            </article>
-            <article class="experience-card" data-title="电子版和纸质版的区别" data-ocr="电子版和纸质版的区别" data-result="弱化" data-reason="可查看原图。">
-              <div class="experience-cover"><img src="assets/posts/manga.jpg" alt="真实小红书帖子《电子版和纸质版的区别》的封面" width="445" height="590" loading="lazy" decoding="async" /><div class="experience-mask" hidden></div></div><div class="experience-card-copy"><h3>电子版和纸质版的区别</h3><p>RyūYukiHō</p><button type="button" class="inspect-button" disabled>尚未识别</button></div>
-            </article>
-            <article class="experience-card" data-title="特朗普下班回到家，累成狗" data-ocr="上班猛如虎，下班累成虫；下班回到家的特朗普" data-result="保留" data-reason="保持可见。">
-              <div class="experience-cover"><img src="assets/posts/meme.jpg" alt="真实小红书帖子《特朗普下班回到家，累成狗》的封面" width="445" height="590" loading="lazy" decoding="async" /><div class="experience-mask" hidden></div></div><div class="experience-card-copy"><h3>特朗普下班回到家，累成狗</h3><p>金生道</p><button type="button" class="inspect-button" disabled>尚未识别</button></div>
-            </article>
-            <article class="experience-card" data-title="椰树牌包装还是太梗直了！" data-ocr="椰树；坚持；加香精；两个婴儿是 AI 生成" data-result="保留" data-reason="保持可见。">
-              <div class="experience-cover"><img src="assets/posts/product.jpg" alt="真实小红书帖子《椰树牌包装还是太梗直了》的封面" width="445" height="590" loading="lazy" decoding="async" /><div class="experience-mask" hidden></div></div><div class="experience-card-copy"><h3>椰树牌包装还是太梗直了！</h3><p>一只S虾</p><button type="button" class="inspect-button" disabled>尚未识别</button></div>
-            </article>
-          </div>
-          <div class="experience-end"><strong>已经刷到这次体验的末尾。</strong><p>想在自己的浏览器里使用？安装扩展后，判断会依据你看到的真实内容进行。</p><button type="button" id="restart-bottom">再体验一次 ↑</button></div>
-        </section>
-        <aside class="experience-panel" aria-label="预设扫描状态与记录">
-          <div class="panel-top"><span class="panel-icon" aria-hidden="true">◉</span><span>RedNote NoBoost</span></div>
-          <div class="panel-health"><span class="health-dot"></span><span>就绪</span></div>
-          <div class="panel-stats"><div><strong id="seen-count">0</strong><span>已识别</span></div><div><strong id="mask-count">0</strong><span>已弱化</span></div><div><strong>$0.00</strong><span>费用</span></div></div>
-          <div class="panel-record"><span class="panel-label">当前记录</span><h3 id="record-title">还没有开始</h3><dl><dt>封面文字</dt><dd id="record-ocr">滚动后显示</dd><dt>输入内容</dt><dd id="record-input">—</dd><dt>结果</dt><dd id="record-result">—</dd></dl></div>
-        </aside>
-      </div>
-    </main>
-    <footer class="experience-footer"><span>RedNote NoBoost</span><span>真实帖子截图；交互结果预设，不代表对原帖的实际判断。本页不调用 Jev。</span><a href="index.html">了解真实扩展 ↗</a></footer>
+  <body>
+    <p><a href="index.html#demo">前往项目介绍与滚动体验</a></p>
   </body>
 </html>

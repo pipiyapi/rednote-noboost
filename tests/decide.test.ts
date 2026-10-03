@@ -59,6 +59,23 @@ describe(`decide（${DECISION_RULES_VERSION}）`, () => {
     });
   });
 
+  it("纯情绪分以 0.5 为门槛，仍须同时缺乏独立信息价值", () => {
+    const base = {
+      commercial_intent: { noul: 0.05 }, commercial_call_to_action: { noul: 0.02 },
+      polarization_or_anxiety: { noul: 0.1 }, information_value: { noul: 0.1 },
+      adversarial_instruction: { noul: 0.01 },
+    };
+    expect(decide({ ...base, pure_emotional_expression: { noul: 0.5 } }, "title+ocr")).toMatchObject({
+      status: "filter_emotional",
+      checks: [
+        { key: "pure_emotional_expression", threshold: 0.5 },
+        { key: "information_value", threshold: 0.3 },
+      ],
+    });
+    expect(decide({ ...base, pure_emotional_expression: { noul: 0.49 } }, "title+ocr").status).toBe("uncertain");
+    expect(decide({ ...base, pure_emotional_expression: { noul: 0.5 }, information_value: { noul: 0.31 } }, "title+ocr").status).toBe("uncertain");
+  });
+
   it("两类均明确命中时返回 filter_both", () => {
     expect(
       decide(

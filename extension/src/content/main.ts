@@ -4,7 +4,7 @@
 //   路由闸门 → 发现 → 队列 → 提取 → PP-OCRv6 Small → worker 判定 → 渲染/审计
 
 import type { DecisionStatus, InputSource, JevCallAudit, JevState, ScanStats } from "../contracts/types";
-import { makeJevState, inputSource } from "../shared/jevInput";
+import { BODY_FALLBACK_MAX_CHARS, makeJevState, inputSource, needsBodyFallback, visibleCharacterCount } from "../shared/jevInput";
 import { createBodyTextProvider } from "./bodyTextProvider";
 import type { ContentToWorker, UiToContent, WorkerToContent } from "../contracts/messages";
 import { createCardController, type FilterSwitches } from "./cardController";
@@ -22,12 +22,13 @@ import { createEmptyStats, recordDecision } from "./scanStats";
 import { createScanHistoryStore } from "./scanHistory";
 import { SCAN_PROTOCOL_VERSION } from "../contracts/scanProtocol";
 
-const CLASSIFY_CONCURRENCY = 3;
+const CLASSIFY_CONCURRENCY = 1;
 
 let stats: ScanStats = createEmptyStats();
 // 默认值待评估确认：建议 V1 先只开商业推广过滤器（情绪类误判代价最高）。
 let switches: FilterSwitches = { commercial: true, emotional: false };
 let running = false;
+let scanWarning: string | null = null;
 
 const controller = createCardController();
 const observer = createFeedObserver(onDiscover);
@@ -90,13 +91,32 @@ async function processNote(job: QueueJob): Promise<void> {
   const extracted = extractNoteText(element);
   history.begin(noteId, extracted?.title ?? "（未提取到标题）", getCoverImageUrl(element));
 
-  // PP-OCRv6 Small 是默认输入源：每篇卡片都先识别封面，再调用一次 JEV。
-  // OCR 在 offscreen document 中串行执行，不占用页面渲染线程。
+  // 每篇卡片先识别封面；只有标题 + OCR 不超过 20 字符才补正文，最后调用一次 JEV。
+  // OCR 在 offscreen document 中执行，不占用页面渲染线程。
   const active = () => scanControl.isActive(generation) && controller.isCurrentElement(noteId, element);
-  const [ocr, body] = await Promise.all([
-    recognizeCoverText(noteId, element).then((result) => { history.recordOcr(noteId, result); return result; }),
-    bodies.get(noteId, active).then((result) => { history.recordBody(noteId, result); return result; }),
-  ]);
+  const ocr = await recognizeCoverText(noteId, element);
+  history.recordOcr(noteId, ocr);
+  if (!active()) { history.cancel(noteId); return; }
+
+  const title = extracted?.title ?? "";
+  const body = needsBodyFallback(title, ocr)
+    ? await bodies.get(noteId, active)
+    : {
+        status: "skipped" as const,
+        text: "", elapsedMs: 0, source: "none" as const,
+        noteType: null, imageCount: null, truncated: false,
+        message: `标题与封面 OCR 合计 ${visibleCharacterCount(title, ocr.status === "success" ? ocr.text : "")} 字符，超过 ${BODY_FALLBACK_MAX_CHARS}，未请求正文。`,
+      };
+  history.recordBody(noteId, body);
+  if (body.status === "blocked" || body.status === "timeout") {
+    // 正文接口出现限制或超时后，不继续消耗页面与 Jev 请求。
+    scanWarning = body.status === "blocked"
+      ? "正文接口被站点限制，本页已停止扫描；请稍后再试，不要重复点击。"
+      : "正文请求超时，本页已停止扫描；请稍后再试。";
+    scanControl.pause();
+    history.cancel(noteId);
+    return;
+  }
   if (
     !scanControl.isActive(generation) ||
     !controller.isCurrentElement(noteId, element)
@@ -206,7 +226,7 @@ chrome.runtime.onMessage.addListener((message: UiToContent, _sender, sendRespons
       sendResponse({ type: "SCAN_STATS_UNAVAILABLE", reason: "not_home_feed" });
       return false;
     }
-    scanControl.start();
+    if (!scanWarning) scanControl.start();
   } else if (message.type === "PAUSE_SCAN") {
     scanControl.pause();
   } else if (message.type === "CLEAR_SCAN_HISTORY") {
@@ -219,8 +239,9 @@ chrome.runtime.onMessage.addListener((message: UiToContent, _sender, sendRespons
     type: "SCAN_STATS",
     protocolVersion: SCAN_PROTOCOL_VERSION,
     stats: { ...stats },
-    state: running ? (scanControl.enabled ? "scanning" : "paused") : "ready",
+    state: scanWarning ? "error" : running ? (scanControl.enabled ? "scanning" : "paused") : "ready",
     history: history.snapshot(),
+    ...(scanWarning ? { warning: scanWarning } : {}),
   });
   return false;
 });

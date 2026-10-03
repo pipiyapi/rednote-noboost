@@ -148,7 +148,7 @@ export type JevCallAudit = {
 };
 
 export type BodyAudit = {
-  status: "pending" | "success" | "empty" | "unavailable" | "timeout" | "blocked" | "cancelled";
+  status: "pending" | "success" | "empty" | "skipped" | "unavailable" | "timeout" | "blocked" | "cancelled";
   text: string;
   elapsedMs: number;
   source: "page_cache" | "background_detail" | "none";

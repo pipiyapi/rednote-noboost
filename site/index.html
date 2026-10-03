@@ -13,6 +13,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="experience.css" />
     <script src="script.js" defer></script>
   </head>
   <body>
@@ -49,11 +50,10 @@
               <p>【记忆系统召回分享】</p>
               <small>チリヌルヲカ</small>
             </article>
-            <article class="feed-card feed-card-filtered" id="demo-card" aria-label="真实推荐流笔记：封面上演示可解除的预设遮罩">
+            <article class="feed-card" aria-label="真实推荐流笔记：arXiv 全面限投">
               <img class="post-cover" src="assets/posts/arxiv.jpg" alt="小红书笔记《arXiv 全面限投》的真实封面截图" width="445" height="590" fetchpriority="high" />
               <p>arXiv 全面限投：每人每月仅 2 篇</p>
               <small>科技圈刚刚</small>
-              <div class="demo-veil" id="demo-veil"><span class="veil-symbol" aria-hidden="true">／</span><strong>内容已弱化</strong><span>随时可以查看原图</span><button id="reveal-demo" type="button">查看原内容</button></div>
             </article>
             <article class="feed-card feed-card-tall" aria-label="真实推荐流笔记：世界上最舒服的配色">
               <img class="post-cover" src="assets/posts/colors.jpg" alt="小红书笔记《世界上最舒服的配色》的真实封面截图" width="445" height="590" fetchpriority="high" />
@@ -62,18 +62,29 @@
           </div>
           <div class="stage-footer"><span>打开信息流</span><span>你始终可以选择看原文</span></div>
         </div>
-        <a class="scroll-cue" href="#why">向下看 <span aria-hidden="true">↓</span></a>
+        <a class="scroll-cue" href="#demo">向下看 <span aria-hidden="true">↓</span></a>
       </section>
 
       <section class="real-demo chapter" id="demo" aria-labelledby="demo-title">
         <div class="real-demo-heading">
-          <div><p class="eyebrow">真实帖子 / 滚动体验</p><h2 id="demo-title">亲自往下刷，<br /><em>看看过滤的手感。</em></h2></div>
-          <p>打开真实帖子组成的信息流，随着滚动查看封面、记录与可逆遮罩。体验页无需登录或 API Key。</p>
+          <div><p class="eyebrow">真实帖子 / 滚动体验</p><h2 id="demo-title">亲自往下刷，<br /><em>看看真实封面。</em></h2></div>
+          <p>沿着这一页向下滚动，像刷推荐流一样看真实帖子。只有经当前插件实际判定命中的内容，才会出现遮罩。</p>
         </div>
-        <div class="experience-teaser">
-          <div class="teaser-covers" aria-hidden="true"><img src="assets/posts/deepseek.jpg" alt="" loading="lazy" /><img src="assets/posts/manga.jpg" alt="" loading="lazy" /><img src="assets/posts/xiaomi.jpg" alt="" loading="lazy" /><img src="assets/posts/product.jpg" alt="" loading="lazy" /></div>
-          <div class="teaser-action"><span>真实帖子素材 · 随时查看原图</span><a class="button button-primary" href="experience.html">进入滚动体验 <span aria-hidden="true">↗</span></a></div>
+        <div class="experience-cards unified-feed" aria-label="真实推荐流帖子封面">
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/memory.jpg" alt="小红书帖子《记忆系统召回分享》封面" width="445" height="590" loading="lazy" /></div><div class="experience-card-copy"><h3>【记忆系统召回分享】</h3><p>チリヌルヲカ</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/arxiv.jpg" alt="小红书帖子《arXiv 全面限投》封面" width="445" height="590" loading="lazy" /></div><div class="experience-card-copy"><h3>arXiv 全面限投：每人每月仅 2 篇</h3><p>科技圈刚刚</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/xiaomi.jpg" alt="小红书帖子《罗福莉升职到小米最高职级》封面" width="445" height="590" loading="lazy" /></div><div class="experience-card-copy"><h3>罗福莉升职到小米最高职级</h3><p>大厂电流</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/colors.jpg" alt="小红书帖子《世界上最舒服的配色》封面" width="445" height="590" loading="lazy" /></div><div class="experience-card-copy"><h3>世界上最舒服的配色 🎨</h3><p>像素与玫瑰</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/deepseek.jpg" alt="小红书帖子《DeepSeek V5 这次不用英伟达了》封面" width="445" height="590" loading="lazy" /></div><div class="experience-card-copy"><h3>DeepSeek V5 这次不用英伟达了</h3><p>艾欧同学</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/manga.jpg" alt="小红书帖子《电子版和纸质版的区别》封面" width="445" height="590" loading="lazy" /></div><div class="experience-card-copy"><h3>电子版和纸质版的区别</h3><p>RyūYukiHō</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/meme.jpg" alt="小红书帖子《特朗普下班回到家》封面" width="445" height="590" loading="lazy" /></div><div class="experience-card-copy"><h3>特朗普下班回到家，累成狗</h3><p>金生道</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/product.jpg" alt="小红书帖子《椰树牌包装还是太梗直了》封面" width="445" height="590" loading="lazy" /></div><div class="experience-card-copy"><h3>椰树牌包装还是太梗直了！</h3><p>一只S虾</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/internet.jpg" alt="小红书帖子《互联网大佬的35岁》封面" width="450" height="600" loading="lazy" /></div><div class="experience-card-copy"><h3>互联网大佬的35岁</h3><p>董阳鸟</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/oneyear.jpg" alt="小红书帖子《为什么越来越多人开始在 One Year 里种花》封面" width="450" height="600" loading="lazy" /></div><div class="experience-card-copy"><h3>为什么越来越多人开始在 One Year 里种花？</h3><p>全世界种折耳根</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/cartoon.jpg" alt="小红书帖子《大耳朵图图童年动画长大》封面" width="440" height="600" loading="lazy" /></div><div class="experience-card-copy"><h3>大耳朵图图，童年动画长大</h3><p>jij</p></div></article>
+          <article class="experience-card"><div class="experience-cover"><img src="assets/posts/laptop.jpg" alt="小红书帖子《月之暗面开发岗已 oc，面试很水不用焦虑》的电脑桌面封面" width="450" height="600" loading="lazy" /></div><div class="experience-card-copy"><h3>月之暗面开发岗已 oc，面试很水不用焦虑</h3><p>喂自己袋盐</p></div></article>
         </div>
+        <div class="experience-end"><p>想在自己的信息流里试试？</p><a class="button button-primary" href="#install">安装并开始扫描 <span aria-hidden="true">↘</span></a></div>
       </section>
 
       <section class="statement chapter" id="why" aria-labelledby="why-title">
@@ -95,11 +106,11 @@
               <p id="graphic-detail">只识别封面，图片留在本地处理。</p>
               <div class="graphic-lines" aria-hidden="true"><span></span><span></span><span></span></div>
             </div>
-            <div class="story-visual-foot"><span>REDNOTE NOBOOST</span><span>内容仅为示意</span></div>
+            <div class="story-visual-foot"><span>REDNOTE NOBOOST</span></div>
           </div>
           <div class="story-steps">
             <article class="story-step active" data-step="0"><span class="step-number">01</span><h3>看封面</h3><p>在浏览器本地运行 PP-OCRv6 Small，提取封面上真正写着什么。不截整页，也不扫描帖子后面的图片。</p></article>
-            <article class="story-step" data-step="1"><span class="step-number">02</span><h3>找正文</h3><p>读标题与当前页面能获取的正文；必要时在后台补取。正文拿不到，就如实记录缺失。</p></article>
+            <article class="story-step" data-step="1"><span class="step-number">02</span><h3>找正文</h3><p>标题与封面文字合计不超过 20 字时才尝试补取正文；正文拿不到，就如实记录缺失。</p></article>
             <article class="story-step" data-step="2"><span class="step-number">03</span><h3>问 Jev</h3><p>把可用文字合并为一次判断。商业意图、情绪刺激与独立信息价值，一起放进同一套规则里看。</p></article>
             <article class="story-step" data-step="3"><span class="step-number">04</span><h3>只模糊明确命中的内容</h3><p>对应过滤开关开启且证据足够时才遮罩。不确定或失败时，帖子保持可见。</p></article>
           </div>

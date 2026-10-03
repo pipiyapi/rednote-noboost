@@ -32,7 +32,20 @@ export type FeedObserver = {
 
 export function createFeedObserver(onDiscover: (note: DiscoveredNote) => void): FeedObserver {
   let seenNoteByElement = new WeakMap<Element, string>();
+  let observedNoteByElement = new WeakMap<Element, string>();
   let timer: number | null = null;
+
+  // 只处理进入视口的卡片，避免一点击开始就把首页预加载的几十篇都排进正文队列。
+  const visible = typeof IntersectionObserver === "undefined" ? null : new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      const card = entry.target;
+      const noteId = extractNoteId(card);
+      if (!noteId || seenNoteByElement.get(card) === noteId) continue;
+      seenNoteByElement.set(card, noteId);
+      onDiscover({ noteId, element: card as HTMLElement });
+    }
+  }, { rootMargin: "120px 0px", threshold: 0 });
 
   const schedule = (): void => {
     if (timer !== null) window.clearTimeout(timer);
@@ -44,12 +57,15 @@ export function createFeedObserver(onDiscover: (note: DiscoveredNote) => void): 
     document.querySelectorAll(CARD_SELECTOR).forEach((card) => {
       const noteId = extractNoteId(card);
       if (!noteId) return;
-      if (seenNoteByElement.get(card) === noteId) return;
-      seenNoteByElement.set(card, noteId);
-
-      // 注意：这里对「已经判定过的 noteId」也要上报一次。
-      // 因为节点可能被虚拟化回收后重挂，上层需要按 noteId 重放模糊状态。
-      onDiscover({ noteId, element: card as HTMLElement });
+      if (observedNoteByElement.get(card) === noteId) return;
+      observedNoteByElement.set(card, noteId);
+      if (visible) {
+        visible.unobserve(card);
+        visible.observe(card);
+      } else if (seenNoteByElement.get(card) !== noteId) {
+        seenNoteByElement.set(card, noteId);
+        onDiscover({ noteId, element: card as HTMLElement });
+      }
     });
   }
 
@@ -59,6 +75,7 @@ export function createFeedObserver(onDiscover: (note: DiscoveredNote) => void): 
     start(): void {
       // stop() 会移除外观；再次进入首页时必须重新上报已有节点以重放判定。
       seenNoteByElement = new WeakMap<Element, string>();
+      observedNoteByElement = new WeakMap<Element, string>();
       observer.observe(document.body, {
         childList: true,
         subtree: true,
@@ -69,6 +86,7 @@ export function createFeedObserver(onDiscover: (note: DiscoveredNote) => void): 
     },
     stop(): void {
       observer.disconnect();
+      visible?.disconnect();
       if (timer !== null) {
         window.clearTimeout(timer);
         timer = null;

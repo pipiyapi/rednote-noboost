@@ -1,12 +1,3 @@
-const card = document.querySelector('#demo-card');
-const revealButton = document.querySelector('#reveal-demo');
-
-revealButton?.addEventListener('click', () => {
-  const revealed = card.classList.toggle('is-revealed');
-  revealButton.textContent = revealed ? '重新显示遮罩' : '查看原内容';
-  revealButton.setAttribute('aria-pressed', String(revealed));
-});
-
 const graphic = document.querySelector('#story-graphic');
 const kicker = document.querySelector('#graphic-kicker');
 const mainText = document.querySelector('#graphic-main');
@@ -15,8 +6,8 @@ const count = document.querySelector('#step-count');
 const steps = [...document.querySelectorAll('.story-step')];
 const phases = [
   { phase: 'cover', kicker: '封面文字 / OCR', main: '封面上真正写着什么？', detail: '只识别封面，图片留在本地处理。' },
-  { phase: 'body', kicker: '标题 + 可用正文', main: '材料能拿到多少，就记录多少。', detail: '正文缺失会标明，不会伪装成空白内容。' },
-  { phase: 'jev', kicker: '一次 Jev 判断', main: '商业意图 × 信息价值', detail: '文字发往 Jev；原始输入输出可在面板查看。' },
+  { phase: 'body', kicker: '标题 + 可用正文', main: '短于 20 字，才补正文。', detail: '标题与封面文字合计不超过 20 字时才尝试补取。' },
+  { phase: 'jev', kicker: '一次 Jev 判断', main: '推广、情绪 × 信息价值', detail: '文字发往 Jev；原始输入输出可在面板查看。' },
   { phase: 'decision', kicker: '保守且可逆', main: '明确命中，才会模糊。', detail: '依据不足、失败或用户主动查看时，内容保持可见。' },
 ];
 
@@ -41,7 +32,7 @@ if ('IntersectionObserver' in window) {
 
 const modeButton = document.querySelector('#present-toggle');
 const modeHint = document.querySelector('#presentation-hint');
-const chapterIds = ['top', 'why', 'how', 'features', 'privacy', 'install'];
+const chapterIds = ['top', 'demo', 'why', 'how', 'features', 'privacy', 'install'];
 
 function setPresentationMode(enabled) {
   document.documentElement.classList.toggle('presentation', enabled);

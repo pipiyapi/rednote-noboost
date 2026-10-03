@@ -11,13 +11,12 @@ import type { DecisionCheck, DecisionStatus, InputSource, JevState, UncertainRea
 import type { JevAnswers } from "./rubric";
 import { hasIncompleteEvidence } from "./jevInput";
 
-export const DECISION_RULES_VERSION = "v2.1-body-cover-uncertain-reasons";
+export const DECISION_RULES_VERSION = "v2.3-emotion-050-body-20";
 
 const THRESHOLDS = {
   adversarial: 0.75,
   commercialIntent: 0.85,
-  commercialCallToAction: 0.75,
-  pureEmotion: 0.9,
+  pureEmotion: 0.5,
   polarization: 0.88,
   lowInformation: 0.35,
   veryLowInformation: 0.3,

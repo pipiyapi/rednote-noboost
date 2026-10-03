@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readBodyInPage, fetchNoteBody } from "../extension/src/background/bodyText";
 import { createBodyTextProvider } from "../extension/src/content/bodyTextProvider";
-import { makeJevState, hasIncompleteEvidence, inputSource } from "../extension/src/shared/jevInput";
+import { makeJevState, hasIncompleteEvidence, inputSource, needsBodyFallback, visibleCharacterCount } from "../extension/src/shared/jevInput";
 import { decide } from "../extension/src/shared/decide";
 import type { BodyAudit, OcrAudit } from "../extension/src/contracts/types";
 
@@ -86,13 +86,13 @@ describe("正文队列、失败停止与取消", () => {
     expect((await provider.get(id, () => false)).status).toBe("cancelled");
     expect(request).not.toHaveBeenCalled();
   });
-  it("请求起始间隔至少两秒", async () => {
+  it("请求起始间隔至少十秒", async () => {
     vi.useFakeTimers(); vi.setSystemTime(10_000);
     const request = vi.fn().mockResolvedValue(body);
     const provider = createBodyTextProvider(request);
     await provider.get(id, () => true);
     const second = provider.get("next", () => true);
-    await vi.advanceTimersByTimeAsync(1999);
+    await vi.advanceTimersByTimeAsync(9999);
     expect(request).toHaveBeenCalledOnce();
     await vi.advanceTimersByTimeAsync(1);
     await second;
@@ -101,6 +101,26 @@ describe("正文队列、失败停止与取消", () => {
 });
 
 describe("结构化证据与保守判定", () => {
+  it("按可见 Unicode 字符决定是否补正文，换行和空格不计入", () => {
+    expect(visibleCharacterCount("😀 甲", "\n乙")).toBe(3);
+    expect(needsBodyFallback("标题", { ...ocr, text: "甲".repeat(18) })).toBe(true);
+    expect(needsBodyFallback("标题", { ...ocr, text: "甲".repeat(19) })).toBe(false);
+    const failedOcr: OcrAudit = { status: "error", model: "PP-OCRv6 Small", coverUrl: null, message: "识别失败" };
+    expect(needsBodyFallback("短标题", failedOcr)).toBe(true);
+    expect(needsBodyFallback("甲".repeat(26), failedOcr)).toBe(false);
+  });
+  it("超过 20 字按规则跳过正文时可用标题与封面判断，但 OCR 错误仍不自动过滤", () => {
+    const skipped: BodyAudit = { ...body, status: "skipped", text: "", source: "none" };
+    const cover = { ...ocr, text: "商品优惠现在领取具体信息都写在这张封面上，请先关注账号再私信领取完整课程" };
+    const state = makeJevState("课程介绍", skipped, cover);
+    expect(inputSource(state)).toBe("title+ocr");
+    expect(hasIncompleteEvidence(state)).toBe(false);
+    expect(decide(answers, inputSource(state), state).status).toBe("filter_commercial");
+
+    const failedOcr: OcrAudit = { status: "error", model: "PP-OCRv6 Small", coverUrl: null, message: "OCR 失败" };
+    expect(hasIncompleteEvidence(makeJevState("这是一条长度超过二十五个字符的测试标题用于验证失败回退", skipped, failedOcr))).toBe(true);
+    expect(hasIncompleteEvidence(makeJevState("标题", skipped, { ...ocr, text: "请看图中未读取的具体资料和详细步骤以及后续截图" }))).toBe(true);
+  });
   it("正文/封面分开、来源准确、缺标题仍能判断", () => {
     const state = makeJevState("", body, ocr);
     expect(inputSource(state)).toBe("page_text+ocr");

@@ -11,7 +11,7 @@ export function createBodyTextProvider(
     const result: WorkerToContent = await chrome.runtime.sendMessage({ type: "GET_NOTE_BODY", noteId });
     return result?.type === "NOTE_BODY" && result.noteId === noteId ? result.body : empty("unavailable", "正文后台没有响应");
   },
-  intervalMs = 2000,
+  intervalMs = 10000,
 ) {
   const cache = new Map<string, BodyAudit>();
   const pending = new Map<string, Promise<BodyAudit>>();

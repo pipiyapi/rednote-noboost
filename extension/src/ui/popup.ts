@@ -19,7 +19,7 @@ import { formatReasons } from "../shared/reasons";
 const STATE_LABELS: Record<ScanState, string> = {
   unconfigured: "未配置 API Key",
   ready: "就绪",
-  scanning: "扫描中 · 正文、封面 OCR 与 JEV 正在处理",
+  scanning: "扫描中 · 封面 OCR、按需正文与 JEV 正在处理",
   paused: "已暂停，点击开始后才会继续检测",
   error: "发生错误",
 };
@@ -285,8 +285,8 @@ function createRecord(record: ScanHistoryRecord, open: boolean): HTMLDetailsElem
   const ocr = describeOcr(record.ocr);
   if (record.body) {
     const b = record.body;
-    const label = { pending: "获取中", success: "已获取", empty: "正文为空", unavailable: "不可用", timeout: "超时", blocked: "已停止补取", cancelled: "已取消" }[b.status];
-    const source = { page_cache: "页面缓存", background_detail: "后台详情", none: "未取得" }[b.source];
+    const label = { pending: "获取中", success: "已获取", empty: "正文为空", skipped: "按长度规则跳过", unavailable: "不可用", timeout: "超时", blocked: "已停止补取", cancelled: "已取消" }[b.status];
+    const source = b.status === "skipped" ? "未发请求" : { page_cache: "页面缓存", background_detail: "后台详情", none: "未取得" }[b.source];
     body.appendChild(auditBlock("正文", `${label} · ${source} · ${b.elapsedMs} ms${b.truncated ? " · 已截断" : ""}`,
       b.text || b.message || (b.status === "empty" ? "接口返回空正文；未读取后续图片或视频，不代表帖子没有内容。" : b.status === "pending" ? "等待正文获取结果…" : "未取得正文，已降级使用其他可用材料。")));
   }
@@ -410,7 +410,7 @@ function setStatus(text: string, muted = false): void {
 
 function renderState(state: ScanState): void {
   setStatus(STATE_LABELS[state] ?? state);
-  startButton.disabled = state === "scanning" || !ocrHealthy;
+  startButton.disabled = state === "scanning" || state === "error" || !ocrHealthy;
   pauseButton.disabled = state !== "scanning";
 }
 
@@ -462,6 +462,7 @@ function renderResponse(response: ContentToUi): void {
   startButton.textContent = "开始扫描";
   historyEmpty.textContent = "开始扫描后，这里会显示每篇帖子的 OCR 与 JEV 明细。";
   renderState(response.state);
+  if (response.warning) setStatus(response.warning);
   renderHistory(normalizeHistory(response.history));
 }
 
