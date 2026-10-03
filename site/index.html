@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#F2F6F5" />
+    <title>RedNote NoBoost｜小红书网页版内容过滤扩展</title>
+    <meta name="description" content="RedNote NoBoost 是一款小红书网页版 Chrome 扩展原型：本地封面 OCR、正文与标题判断、可逆遮罩、透明的检测记录。了解功能并在本地试用。" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="RedNote NoBoost｜把注意力留给值得看的笔记" />
+    <meta property="og:description" content="小红书网页版内容过滤扩展原型。封面 OCR、正文判断、可逆遮罩；每一步都看得见。" />
+    <meta property="og:image" content="assets/social-card.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">跳到主要内容</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="RedNote NoBoost，返回顶部"><span class="brand-mark" aria-hidden="true"><span></span></span><span>RedNote <strong>NoBoost</strong></span></a>
+      <nav aria-label="页面导航">
+        <a href="#demo">体验页面</a>
+        <a href="#how">工作方式</a>
+        <a href="#features">主要功能</a>
+        <a href="#install">安装试用</a>
+      </nav>
+      <button class="mode-button" id="present-toggle" type="button" aria-pressed="false">展示模式 <span aria-hidden="true">↗</span></button>
+    </header>
+
+    <main id="main">
+      <section class="hero chapter" id="top" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="eyebrow-line"></span> 面向小红书网页版的 Chrome 扩展原型</p>
+          <h1 id="hero-title">刷小红书时，<br />把选择权<br /><em>拿回来。</em></h1>
+          <p class="hero-lead">明显的推广与空洞的情绪内容，会占用你的视线。RedNote NoBoost 让它们安静一点，也让判断理由摆在明处。</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#how">看看它怎么工作 <span aria-hidden="true">↘</span></a>
+            <a class="text-link" href="https://github.com/pipiyapi/rednote-noboost">查看 GitHub 仓库 <span aria-hidden="true">↗</span></a>
+          </div>
+          <p class="hero-note">手动启动 · 命中才模糊 · 随时查看原文</p>
+        </div>
+
+        <div class="hero-stage" aria-label="内容过滤的界面示意">
+          <div class="stage-header"><span class="stage-dot"></span><span>首页推荐流</span><span class="stage-counter">01 / 03</span></div>
+          <div class="feed-grid">
+            <article class="feed-card feed-card-quiet" aria-label="真实推荐流笔记：记忆系统召回分享">
+              <img class="post-cover" src="assets/posts/memory.jpg" alt="小红书笔记《记忆系统召回分享》的真实封面截图" width="445" height="590" fetchpriority="high" />
+              <p>【记忆系统召回分享】</p>
+              <small>チリヌルヲカ</small>
+            </article>
+            <article class="feed-card feed-card-filtered" id="demo-card" aria-label="真实推荐流笔记：封面上演示可解除的预设遮罩">
+              <img class="post-cover" src="assets/posts/arxiv.jpg" alt="小红书笔记《arXiv 全面限投》的真实封面截图" width="445" height="590" fetchpriority="high" />
+              <p>arXiv 全面限投：每人每月仅 2 篇</p>
+              <small>科技圈刚刚</small>
+              <div class="demo-veil" id="demo-veil"><span class="veil-symbol" aria-hidden="true">／</span><strong>内容已弱化</strong><span>随时可以查看原图</span><button id="reveal-demo" type="button">查看原内容</button></div>
+            </article>
+            <article class="feed-card feed-card-tall" aria-label="真实推荐流笔记：世界上最舒服的配色">
+              <img class="post-cover" src="assets/posts/colors.jpg" alt="小红书笔记《世界上最舒服的配色》的真实封面截图" width="445" height="590" fetchpriority="high" />
+              <p>世界上最舒服的配色 🎨</p><small>像素与玫瑰</small>
+            </article>
+          </div>
+          <div class="stage-footer"><span>打开信息流</span><span>你始终可以选择看原文</span></div>
+        </div>
+        <a class="scroll-cue" href="#why">向下看 <span aria-hidden="true">↓</span></a>
+      </section>
+
+      <section class="real-demo chapter" id="demo" aria-labelledby="demo-title">
+        <div class="real-demo-heading">
+          <div><p class="eyebrow">真实帖子 / 滚动体验</p><h2 id="demo-title">亲自往下刷，<br /><em>看看过滤的手感。</em></h2></div>
+          <p>打开真实帖子组成的信息流，随着滚动查看封面、记录与可逆遮罩。体验页无需登录或 API Key。</p>
+        </div>
+        <div class="experience-teaser">
+          <div class="teaser-covers" aria-hidden="true"><img src="assets/posts/deepseek.jpg" alt="" loading="lazy" /><img src="assets/posts/manga.jpg" alt="" loading="lazy" /><img src="assets/posts/xiaomi.jpg" alt="" loading="lazy" /><img src="assets/posts/product.jpg" alt="" loading="lazy" /></div>
+          <div class="teaser-action"><span>真实帖子素材 · 随时查看原图</span><a class="button button-primary" href="experience.html">进入滚动体验 <span aria-hidden="true">↗</span></a></div>
+        </div>
+      </section>
+
+      <section class="statement chapter" id="why" aria-labelledby="why-title">
+        <div class="statement-inner">
+          <p class="eyebrow eyebrow-light">不是屏蔽一切</p>
+          <h2 id="why-title">内容不是越多越好。<br /><span>看得清楚，才有选择。</span></h2>
+          <div class="statement-bottom"><p>这个项目不评价作者，也不把“提到商品”或“表达情绪”当成问题。它尝试识别的是：强烈的转化意图，和缺乏事实与信息增量的情绪刺激。</p><p class="statement-side">值得看的笔记，<br />继续留在信息流里。</p></div>
+        </div>
+      </section>
+
+      <section class="story chapter" id="how" aria-labelledby="how-title">
+        <div class="story-intro"><p class="eyebrow">它如何判断</p><h2 id="how-title">从封面到决定，<br />每一步都可追溯。</h2></div>
+        <div class="story-layout">
+          <div class="story-visual" aria-live="polite">
+            <div class="story-visual-head"><span class="story-pulse"></span><span>单篇笔记 · 判断示意</span><span id="step-count">01 / 04</span></div>
+            <div class="story-graphic" id="story-graphic" data-phase="cover">
+              <p class="graphic-kicker" id="graphic-kicker">封面文字 / OCR</p>
+              <strong id="graphic-main">封面上真正写着什么？</strong>
+              <p id="graphic-detail">只识别封面，图片留在本地处理。</p>
+              <div class="graphic-lines" aria-hidden="true"><span></span><span></span><span></span></div>
+            </div>
+            <div class="story-visual-foot"><span>REDNOTE NOBOOST</span><span>内容仅为示意</span></div>
+          </div>
+          <div class="story-steps">
+            <article class="story-step active" data-step="0"><span class="step-number">01</span><h3>看封面</h3><p>在浏览器本地运行 PP-OCRv6 Small，提取封面上真正写着什么。不截整页，也不扫描帖子后面的图片。</p></article>
+            <article class="story-step" data-step="1"><span class="step-number">02</span><h3>找正文</h3><p>读标题与当前页面能获取的正文；必要时在后台补取。正文拿不到，就如实记录缺失。</p></article>
+            <article class="story-step" data-step="2"><span class="step-number">03</span><h3>问 Jev</h3><p>把可用文字合并为一次判断。商业意图、情绪刺激与独立信息价值，一起放进同一套规则里看。</p></article>
+            <article class="story-step" data-step="3"><span class="step-number">04</span><h3>只模糊明确命中的内容</h3><p>对应过滤开关开启且证据足够时才遮罩。不确定或失败时，帖子保持可见。</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="features chapter" id="features" aria-labelledby="features-title">
+        <div class="features-heading"><p class="eyebrow">控制权在你手里</p><h2 id="features-title">不是黑箱。<br /><em>也不是一刀切。</em></h2></div>
+        <div class="feature-list">
+          <article><span class="feature-index">A</span><div><h3>两类开关，自己决定</h3><p>商业推广与情绪类内容分别启用。关掉的类别不会成为当前遮罩原因。</p></div><span class="feature-glyph" aria-hidden="true">⌁</span></article>
+          <article><span class="feature-index">B</span><div><h3>为什么模糊，直接说明</h3><p>遮罩会列出实际命中的判断与阈值。你可以查看原内容，当前页面不再反复遮住它。</p></div><span class="feature-glyph" aria-hidden="true">◌</span></article>
+          <article><span class="feature-index">C</span><div><h3>记录一次判断的来龙去脉</h3><p>面板可查看逐帖 OCR、Jev 输入输出、结果与费用估算。检测历史只属于当前页面会话。</p></div><span class="feature-glyph" aria-hidden="true">▤</span></article>
+        </div>
+        <div class="health-strip"><span><i></i> OCR 健康，才允许开始扫描</span><span>扫描默认暂停 · 需要你主动启动</span></div>
+      </section>
+
+      <section class="boundary chapter" id="privacy" aria-labelledby="boundary-title">
+        <div><p class="eyebrow eyebrow-light">透明边界</p><h2 id="boundary-title">图片留在本地，<br />文字用于判断。</h2></div>
+        <div class="boundary-detail"><p>封面由本地 OCR 识别；标题、取得的正文与 OCR 文字会发送给 TypeSafe/Jev。个人 API Key 保存在浏览器本地扩展存储中。</p><p>扩展不自动打开帖子，也不点赞、评论或发布内容。它只在桌面 Chrome 的小红书网页版首页推荐流工作；未登录时可能被网站要求登录。</p><p class="boundary-note">当前仍是 V1 原型；识别与判定需要真实使用和带标签样本继续验证。</p></div>
+      </section>
+
+      <section class="install chapter" id="install" aria-labelledby="install-title">
+        <div class="install-head"><p class="eyebrow">本地试用</p><h2 id="install-title">准备好了，<br /><em>从这里开始。</em></h2><p>Chrome 116+ · Node.js 20+ · 你自己的 TypeSafe/Jev API Key</p></div>
+        <ol class="install-steps"><li><span>01</span><div><strong>获取源码并构建</strong><code>git clone https://github.com/pipiyapi/rednote-noboost.git<br />cd rednote-noboost<br />npm ci &amp;&amp; npm run build</code></div></li><li><span>02</span><div><strong>加载扩展</strong><p>在 <code>chrome://extensions</code> 开启开发者模式，加载仓库里的 <code>extension/</code> 文件夹。</p></div></li><li><span>03</span><div><strong>配置并开始</strong><p>在插件面板保存 Jev API Key，等待 OCR 显示绿色“健康”，再打开小红书网页版首页点击“开始扫描”。</p></div></li></ol>
+        <div class="install-actions"><a class="button button-primary" href="https://github.com/pipiyapi/rednote-noboost">前往 GitHub <span aria-hidden="true">↗</span></a><a class="text-link" href="https://github.com/pipiyapi/rednote-noboost#readme">阅读完整说明 <span aria-hidden="true">↗</span></a></div>
+      </section>
+    </main>
+
+    <footer class="site-footer"><span>RedNote NoBoost</span><span>把注意力留给值得看的笔记。</span><a href="#top">回到顶部 ↑</a><small>独立个人实验项目，与小红书、TypeSafe 或 PaddleOCR 官方无隶属关系。</small></footer>
+    <p class="presentation-hint" id="presentation-hint" hidden>展示模式 · 向下滚动或按方向键切换章节 · 点击右上角退出</p>
+  </body>
+</html>

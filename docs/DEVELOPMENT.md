@@ -1,6 +1,6 @@
 # 开发说明
 
-> **产品与开发约定的基线在仓库根目录的 [`README.md`](../README.md)。**
+> **产品与开发约定的基线在 [`PROJECT-BASELINE.md`](PROJECT-BASELINE.md)。**
 > 按基线自己的规定，它是唯一真源；实现细节与它冲突时，先更新并确认基线，再改代码。
 >
 > 本文件只回答「怎么搭起来、怎么跑、骨架现在处于什么状态」。
@@ -51,7 +51,7 @@ npm run watch      # 边改边构建
 
 | 文件 | 作用 |
 | --- | --- |
-| `../README.md` | **V1 基线**（唯一真源） |
+| `docs/PROJECT-BASELINE.md` | **V1 基线**（唯一真源） |
 | `docs/VALIDATION.md` | Phase 0 三个技术假设的验证台账（先做这个） |
 | `docs/DECISIONS.md` | 技术决策记录（ADR），含 7 条已定/待定选择 |
 | `docs/BASELINE-REVIEW.md` | 对基线待确认处的建议清单（不改基线正文，供协作者讨论） |
